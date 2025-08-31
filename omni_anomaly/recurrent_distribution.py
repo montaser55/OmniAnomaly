@@ -1,6 +1,182 @@
 # -*- coding: utf-8 -*-
 import tensorflow as tf
-from tfsnippet import Distribution, Normal
+# from tfsnippet import Distribution, Normal
+
+
+class Distribution:
+    """
+    Minimal replacement for tfsnippet Distribution base class.
+    This provides the basic interface that all distributions should implement.
+    """
+
+    def __init__(self):
+        self._is_continuous = True
+        self._is_reparameterized = False
+
+    @property
+    def is_continuous(self):
+        """Whether this is a continuous distribution"""
+        return self._is_continuous
+
+    @property
+    def is_reparameterized(self):
+        """Whether this distribution supports reparameterization"""
+        return self._is_reparameterized
+
+    @property
+    def dtype(self):
+        """Data type of the distribution"""
+        raise NotImplementedError("dtype property must be implemented")
+
+    @property
+    def value_shape(self):
+        """Shape of a single sample from the distribution"""
+        return self.get_value_shape()
+
+    def get_value_shape(self):
+        """Get the shape of a single sample"""
+        raise NotImplementedError("get_value_shape must be implemented")
+
+    @property
+    def batch_shape(self):
+        """Batch shape of the distribution"""
+        return self.get_batch_shape()
+
+    def get_batch_shape(self):
+        """Get the batch shape"""
+        raise NotImplementedError("get_batch_shape must be implemented")
+
+    def sample(self, n_samples=None, is_reparameterized=None, group_ndims=0,
+               compute_density=False, name=None):
+        """
+        Sample from the distribution.
+
+        Args:
+            n_samples: Number of samples to draw
+            is_reparameterized: Whether to use reparameterized sampling
+            group_ndims: Number of dimensions to consider as event dimensions
+            compute_density: Whether to compute density for the samples
+            name: Name scope for the operation
+
+        Returns:
+            Samples from the distribution
+        """
+        raise NotImplementedError("sample must be implemented")
+
+    def log_prob(self, given, group_ndims=0, name=None):
+        """
+        Compute log probability of given values.
+
+        Args:
+            given: Values to compute log probability for
+            group_ndims: Number of dimensions to consider as event dimensions
+            name: Name scope for the operation
+
+        Returns:
+            Log probabilities
+        """
+        raise NotImplementedError("log_prob must be implemented")
+
+    def prob(self, given, group_ndims=0, name=None):
+        """
+        Compute probability of given values.
+
+        Args:
+            given: Values to compute probability for
+            group_ndims: Number of dimensions to consider as event dimensions
+            name: Name scope for the operation
+
+        Returns:
+            Probabilities
+        """
+        log_p = self.log_prob(given, group_ndims=group_ndims, name=name)
+        return tf.exp(log_p)
+
+
+class Normal(Distribution):
+    """
+    Minimal replacement for tfsnippet Normal distribution.
+    Wraps tfp.distributions.Normal to maintain tfsnippet API.
+    """
+
+    def __init__(self, mean, std, is_reparameterized=True, dtype=tf.float32, name=None):
+        """
+        Initialize Normal distribution.
+
+        Args:
+            mean: Mean of the distribution
+            std: Standard deviation of the distribution
+            is_reparameterized: Whether to use reparameterized sampling
+            dtype: Data type of the distribution
+            name: Name of the distribution
+        """
+        super().__init__()
+        self.mean = mean
+        self.std = std
+        self._is_reparameterized = is_reparameterized
+        self._dtype = dtype
+        self._name = name
+
+        # Create the underlying TFP distribution
+        self._tfp_dist = tfp.distributions.Normal(
+            loc=mean,
+            scale=std,
+            validate_args=True,
+            allow_nan_stats=False,
+            name=name
+        )
+
+    @property
+    def dtype(self):
+        return self._dtype
+
+    def get_value_shape(self):
+        return self._tfp_dist.event_shape
+
+    def get_batch_shape(self):
+        return self._tfp_dist.batch_shape
+
+    def sample(self, n_samples=None, is_reparameterized=None, group_ndims=0,
+               compute_density=False, name=None):
+        """
+        Sample from the normal distribution.
+        """
+        if is_reparameterized is None:
+            is_reparameterized = self.is_reparameterized
+
+        with tf.name_scope(name or self._name or "normal_sample"):
+            # Sample from the underlying TFP distribution
+            if n_samples is not None:
+                samples = self._tfp_dist.sample(n_samples)
+            else:
+                samples = self._tfp_dist.sample()
+
+            # Simple wrapper to maintain compatibility with existing code
+            class SampleResult:
+                def __init__(self, tensor, distribution):
+                    self.tensor = tensor
+                    self.distribution = distribution
+
+                def log_prob(self):
+                    return distribution.log_prob(self.tensor)
+
+            result = SampleResult(samples, self)
+
+            if compute_density:
+                # Compute density if requested
+                result._self_prob = tf.exp(self.log_prob(samples))
+
+            return result
+
+    def log_prob(self, given, group_ndims=0, name=None):
+        """
+        Compute log probability of given values.
+        """
+        with tf.name_scope(name or self._name or "normal_log_prob"):
+            return self._tfp_dist.log_prob(given)
+
+    def __repr__(self):
+        return f"Normal(mean={self.mean}, std={self.std})"
 
 
 class RecurrentDistribution(Distribution):

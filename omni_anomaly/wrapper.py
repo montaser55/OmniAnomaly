@@ -3,7 +3,41 @@ import logging
 
 import tensorflow as tf
 import tensorflow_probability as tfp
-from tfsnippet.distributions import Distribution
+# from tfsnippet.distributions import Distribution
+
+class Distribution:
+
+    def __init__(self):
+        self._is_continuous = True
+        self._is_reparameterized = False
+
+    @property
+    def is_continuous(self):
+        return self._is_continuous
+
+    @property
+    def is_reparameterized(self):
+        return self._is_reparameterized
+
+    @property
+    def value_shape(self):
+        return self.get_value_shape()
+
+    def get_value_shape(self):
+        raise NotImplementedError
+
+    @property
+    def batch_shape(self):
+        return self.get_batch_shape()
+
+    def get_batch_shape(self):
+        raise NotImplementedError
+
+    def sample(self, n_samples=None, is_reparameterized=None, group_ndims=0, compute_density=False, name=None):
+        raise NotImplementedError
+
+    def log_prob(self, given, group_ndims=0, name=None):
+        raise NotImplementedError
 
 
 class TfpDistribution(Distribution):
@@ -51,13 +85,23 @@ class TfpDistribution(Distribution):
 
     def sample(self, n_samples=None, is_reparameterized=None, group_ndims=0, compute_density=False,
                name=None):
-        from tfsnippet.stochastic import StochasticTensor
+        class SimpleStochasticTensor:
+            def __init__(self, tensor, distribution, n_samples, group_ndims, is_reparameterized):
+                self.tensor = tensor
+                self.distribution = distribution
+                self.n_samples = n_samples
+                self.group_ndims = group_ndims
+                self.is_reparameterized = is_reparameterized
+                self._self_prob = None
+
+            def log_prob(self):
+                return self.distribution.log_prob(self.tensor)
         if n_samples is None or n_samples < 2:
             n_samples = 2
         with tf.name_scope(name=name, default_name='sample'):
             samples = self._distribution.sample(n_samples)
             samples = tf.reduce_mean(samples, axis=0)
-            t = StochasticTensor(
+            t = SimpleStochasticTensor(
                 distribution=self,
                 tensor=samples,
                 n_samples=n_samples,
@@ -72,8 +116,7 @@ class TfpDistribution(Distribution):
 
     def log_prob(self, given, group_ndims=0, name=None):
         with tf.name_scope(name=name, default_name='log_prob'):
-            log_prob, _, _, _, _, _, _ = self._distribution.forward_filter(given)
-            return log_prob
+            return self._distribution.log_prob(given)
 
 
 def softplus_std(inputs, units, epsilon, name):

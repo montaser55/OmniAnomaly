@@ -5,11 +5,11 @@ import sys
 from pickle import dump
 
 import numpy as np
-from tfsnippet.utils import makedirs
+#from tfsnippet.utils import makedirs
 
 output_folder = 'processed'
-makedirs(output_folder, exist_ok=True)
-
+#makedirs(output_folder, exist_ok=True)
+os.makedirs(output_folder, exist_ok=True)
 
 def load_and_save(category, filename, dataset, dataset_folder):
     temp = np.genfromtxt(os.path.join(dataset_folder, category, filename),
@@ -36,7 +36,8 @@ def load_data(dataset):
             res = [row for row in csv_reader][1:]
         res = sorted(res, key=lambda k: k[0])
         label_folder = os.path.join(dataset_folder, 'test_label')
-        makedirs(label_folder, exist_ok=True)
+        #makedirs(label_folder, exist_ok=True)
+        os.makedirs(label_folder, exist_ok=True)
         data_info = [row for row in res if row[1] == dataset and row[0] != 'P-2']
         labels = []
         for row in data_info:

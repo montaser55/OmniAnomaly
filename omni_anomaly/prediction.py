@@ -4,13 +4,96 @@ import time
 import numpy as np
 import six
 import tensorflow as tf
-from tfsnippet.utils import (VarScopeObject, get_default_session_or_error,
-                             reopen_variable_scope)
+# from tfsnippet.utils import (VarScopeObject, get_default_session_or_error,
+#                              reopen_variable_scope)
 
 from omni_anomaly.utils import BatchSlidingWindow
 
 __all__ = ['Predictor']
 
+
+# Replace this import:
+# from tfsnippet.utils import (VarScopeObject, get_default_session_or_error,
+#                              reopen_variable_scope)
+
+# With these implementations:
+
+class VarScopeObject:
+
+    def __init__(self, name=None, scope=None):
+        self._name = name
+        # Use current variable scope if none provided
+        self._scope = scope or tf.compat.v1.get_variable_scope().name
+
+    @property
+    def name(self):
+        """Get the name of this object"""
+        return self._name
+
+    @property
+    def variable_scope(self):
+        """Get the variable scope name associated with this object"""
+        return self._scope
+
+    def __repr__(self):
+        return f"VarScopeObject(name={self._name}, scope={self._scope})"
+
+
+def get_default_session_or_error():
+    """
+    Get the default TensorFlow session or raise an error if none exists.
+
+    Returns:
+        tf.compat.v1.Session: The default TensorFlow session
+
+    Raises:
+        RuntimeError: If no default session is available
+    """
+    session = tf.compat.v1.get_default_session()
+    if session is None:
+        raise RuntimeError('No default TensorFlow session is available. '
+                           'Please ensure you are running within a TensorFlow session context.')
+    return session
+
+
+def reopen_variable_scope(scope):
+    """
+    Reopen a variable scope for reuse (variable sharing).
+
+    Args:
+        scope: The variable scope to reopen
+
+    Returns:
+        tf.compat.v1.variable_scope: A reopened variable scope context manager
+    """
+    return tf.compat.v1.variable_scope(scope, reuse=True)
+
+
+# Additional utility that's often used with these
+def ensure_variables_initialized(var_list=None):
+    """
+    Ensure that variables are initialized in the current session.
+
+    Args:
+        var_list: List of variables to initialize (default: all global variables)
+    """
+    if var_list is None:
+        var_list = tf.compat.v1.global_variables()
+
+    session = get_default_session_or_error()
+
+    # Check which variables are not initialized
+    uninitialized_vars = []
+    for var in var_list:
+        try:
+            session.run(var)
+        except tf.errors.FailedPreconditionError:
+            uninitialized_vars.append(var)
+
+    # Initialize uninitialized variables
+    if uninitialized_vars:
+        init_op = tf.compat.v1.variables_initializer(uninitialized_vars)
+        session.run(init_op)
 
 class Predictor(VarScopeObject):
     """

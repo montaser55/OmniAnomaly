@@ -7,12 +7,13 @@ import time
 import warnings
 from argparse import ArgumentParser
 from pprint import pformat, pprint
+import json
 
 import numpy as np
 import tensorflow as tf
-from tfsnippet.examples.utils import MLResults, print_with_title
-from tfsnippet.scaffold import VariableSaver
-from tfsnippet.utils import get_variables_as_dict, register_config_arguments, Config
+# from tfsnippet.examples.utils import MLResults, print_with_title
+# from tfsnippet.scaffold import VariableSaver
+# from tfsnippet.utils import get_variables_as_dict, register_config_arguments, Config
 
 from omni_anomaly.eval_methods import pot_eval, bf_search
 from omni_anomaly.model import OmniAnomaly
@@ -20,6 +21,177 @@ from omni_anomaly.prediction import Predictor
 from omni_anomaly.training import Trainer
 from omni_anomaly.utils import get_data_dim, get_data, save_z
 
+
+class MLResults:
+    """
+    Minimal replacement for MLResults - handles experiment results and logging
+    """
+
+    def __init__(self, result_dir):
+        self.result_dir = result_dir
+        os.makedirs(result_dir, exist_ok=True)
+        self.metrics = {}
+
+    def save_config(self, config):
+        """Save configuration to JSON file"""
+        config_path = os.path.join(self.result_dir, 'config.json')
+        with open(config_path, 'w') as f:
+            json.dump(vars(config) if hasattr(config, '__dict__') else config, f, indent=2)
+
+    def update_metrics(self, metrics_dict):
+        """Update metrics dictionary"""
+        self.metrics.update(metrics_dict)
+        # Save metrics to file
+        metrics_path = os.path.join(self.result_dir, 'metrics.json')
+        with open(metrics_path, 'w') as f:
+            json.dump(self.metrics, f, indent=2)
+
+    def make_dirs(self, dir_path, exist_ok=True):
+        """Create directory structure"""
+        full_path = os.path.join(self.result_dir, dir_path)
+        os.makedirs(full_path, exist_ok=exist_ok)
+        return full_path
+
+    def open(self, filename, mode='w'):
+        """Open a file in the results directory"""
+        return open(os.path.join(self.result_dir, filename), mode)
+
+
+# ==================== print_with_title Replacement ====================
+def print_with_title(title, content, before='\n', after='\n'):
+    """
+    Print content with a formatted title header
+    """
+    print(f"{before}{'=' * 60}")
+    print(f"{title.center(60)}")
+    print(f"{'=' * 60}")
+    print(content)
+    if after:
+        print(after)
+
+
+# ==================== VariableSaver Replacement ====================
+class VariableSaver:
+    """
+    Minimal replacement for VariableSaver - handles model checkpointing
+    """
+
+    def __init__(self, var_dict, save_dir):
+        self.var_dict = var_dict
+        self.save_dir = save_dir
+        os.makedirs(save_dir, exist_ok=True)
+        self.saver = tf.compat.v1.train.Saver(var_dict)
+
+    def save(self, global_step=None):
+        """Save variables to checkpoint"""
+        session = tf.compat.v1.get_default_session()
+        if session is None:
+            raise RuntimeError("No TensorFlow session available for saving")
+
+        save_path = os.path.join(self.save_dir, 'model.ckpt')
+        self.saver.save(session, save_path, global_step=global_step)
+        print(f"Model saved to {save_path}")
+
+    def restore(self):
+        """Restore variables from checkpoint"""
+        session = tf.compat.v1.get_default_session()
+        if session is None:
+            raise RuntimeError("No TensorFlow session available for restoring")
+
+        # Try to find the latest checkpoint
+        ckpt = tf.compat.v1.train.latest_checkpoint(self.save_dir)
+        if ckpt is None:
+            raise FileNotFoundError(f"No checkpoint found in {self.save_dir}")
+
+        self.saver.restore(session, ckpt)
+        print(f"Model restored from {ckpt}")
+
+
+# ==================== Config System Replacement ====================
+class Config:
+    """
+    Minimal replacement for Config - handles configuration management
+    """
+
+    def __init__(self, **kwargs):
+        self._config_dict = {}
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+            self._config_dict[key] = value
+
+    def to_dict(self):
+        """Convert config to dictionary"""
+        return self._config_dict.copy()
+
+    def __setattr__(self, key, value):
+        if key != '_config_dict':
+            self._config_dict[key] = value
+        super().__setattr__(key, value)
+
+    def __getitem__(self, key):
+        return getattr(self, key)
+
+    def __setitem__(self, key, value):
+        setattr(self, key, value)
+
+    def __contains__(self, key):
+        return hasattr(self, key)
+
+    def __repr__(self):
+        return f"Config({self._config_dict})"
+
+
+# ==================== Utility Functions ====================
+def get_variables_as_dict(scope=None, collection=tf.compat.v1.GraphKeys.GLOBAL_VARIABLES):
+    """
+    Get variables as a dictionary with their names as keys
+    """
+    if scope is None:
+        variables = tf.compat.v1.get_collection(collection)
+    else:
+        variables = tf.compat.v1.get_collection(collection, scope=scope)
+
+    return {var.name.split(':')[0]: var for var in variables}
+
+
+def register_config_arguments(config, arg_parser):
+    """
+    Register configuration attributes as command line arguments
+    """
+    if not isinstance(arg_parser, ArgumentParser):
+        raise TypeError("arg_parser must be an ArgumentParser instance")
+
+    config_dict = config.to_dict() if hasattr(config, 'to_dict') else vars(config)
+
+    for key, value in config_dict.items():
+        if key.startswith('_'):
+            continue  # Skip private attributes
+
+        arg_type = type(value) if value is not None else str
+        if arg_type == bool:
+            # Handle boolean flags
+            arg_parser.add_argument(f'--{key}', action='store_true', default=value,
+                                    help=f'{key} (default: {value})')
+        else:
+            arg_parser.add_argument(f'--{key}', type=arg_type, default=value,
+                                    help=f'{key} (default: {value})')
+
+    return arg_parser
+
+
+# Helper function to parse arguments and update config
+def parse_config_args(config, args=None):
+    """Parse command line arguments and update config"""
+    arg_parser = ArgumentParser()
+    register_config_arguments(config, arg_parser)
+    parsed_args = arg_parser.parse_args(args)
+
+    # Update config with parsed arguments
+    for key, value in vars(parsed_args).items():
+        if hasattr(config, key):
+            setattr(config, key, value)
+
+    return config
 
 class ExpConfig(Config):
     # dataset configuration

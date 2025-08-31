@@ -1,12 +1,108 @@
 # -*- coding: utf-8 -*-
 import tensorflow as tf
-from tfsnippet.bayes import BayesianNet
-from tfsnippet.distributions import Distribution
-from tfsnippet.stochastic import StochasticTensor, validate_n_samples_arg
-from tfsnippet.utils import (instance_reuse, is_tensor_object,
-                             reopen_variable_scope, VarScopeObject)
-from tfsnippet.variational import VariationalChain
+# from tfsnippet.bayes import BayesianNet
+# from tfsnippet.distributions import Distribution
+# from tfsnippet.stochastic import StochasticTensor, validate_n_samples_arg
+# from tfsnippet.utils import (instance_reuse, is_tensor_object,
+#                              reopen_variable_scope, VarScopeObject)
 
+
+class BayesianNet:
+    def __init__(self):
+        self._nodes = {}
+
+    def add(self, name, distribution, **kwargs):
+        self._nodes[name] = {'distribution': distribution, 'kwargs': kwargs}
+        return self
+
+    def __getitem__(self, name):
+        return self._nodes[name]
+
+    def output(self, names=None):
+        if names is None:
+            return self._nodes
+        return {name: self._nodes[name] for name in names}
+
+
+class Distribution:
+    def __init__(self):
+        self._is_continuous = True
+        self._is_reparameterized = False
+
+    @property
+    def is_continuous(self):
+        return self._is_continuous
+
+    @property
+    def is_reparameterized(self):
+        return self._is_reparameterized
+
+    def get_value_shape(self):
+        raise NotImplementedError
+
+    def get_batch_shape(self):
+        raise NotImplementedError
+
+    def sample(self, n_samples=None, **kwargs):
+        raise NotImplementedError
+
+    def log_prob(self, given, **kwargs):
+        raise NotImplementedError
+
+
+class StochasticTensor:
+    def __init__(self, distribution, tensor, n_samples=1, group_ndims=0, is_reparameterized=None):
+        self.distribution = distribution
+        self.tensor = tensor
+        self.n_samples = n_samples
+        self.group_ndims = group_ndims
+        self.is_reparameterized = is_reparameterized if is_reparameterized is not None else distribution.is_reparameterized
+        self._self_prob = None
+
+    def log_prob(self):
+        return self.distribution.log_prob(self.tensor)
+
+    def prob(self):
+        if self._self_prob is None:
+            self._self_prob = tf.exp(self.log_prob())
+        return self._self_prob
+
+
+def validate_n_samples_arg(n_samples, name='n_samples'):
+    if n_samples is not None and n_samples < 1:
+        raise ValueError('{} must be None or a positive integer.'.format(name))
+    return n_samples
+
+
+def instance_reuse(func):
+    """Minimal decorator replacement for instance_reuse"""
+    return func
+
+
+def is_tensor_object(obj):
+    """Check if object is a TensorFlow tensor"""
+    return tf.is_tensor(obj)
+
+
+def reopen_variable_scope(scope):
+    """Minimal variable scope reopening"""
+    return tf.compat.v1.variable_scope(scope, reuse=True)
+
+
+class VarScopeObject:
+    """Minimal variable scope object base"""
+
+    def __init__(self, name=None, scope=None):
+        self._name = name
+        self._scope = scope
+
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def variable_scope(self):
+        return self._scope
 
 class VAE(VarScopeObject):
     """

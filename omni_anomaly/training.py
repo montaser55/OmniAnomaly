@@ -4,14 +4,105 @@ import time
 import numpy as np
 import six
 import tensorflow as tf
-from tfsnippet.scaffold import TrainLoop
-from tfsnippet.shortcuts import VarScopeObject
-from tfsnippet.utils import (reopen_variable_scope,
-                             get_default_session_or_error,
-                             ensure_variables_initialized,
-                             get_variables_as_dict)
+
+
+# Replace tfsnippet imports with minimal implementations
+# from tfsnippet.scaffold import TrainLoop
+# from tfsnippet.shortcuts import VarScopeObject
+# from tfsnippet.utils import (reopen_variable_scope,
+#                              get_default_session_or_error,
+#                              ensure_variables_initialized,
+#                              get_variables_as_dict)
 
 from omni_anomaly.utils import BatchSlidingWindow
+
+class TrainLoop:
+    def __init__(self, max_epoch=None, max_step=None, name='TrainLoop'):
+        self.max_epoch = max_epoch
+        self.max_step = max_step
+        self.name = name
+        self._epoch = 0
+        self._step = 0
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        if (self.max_epoch is not None and self._epoch >= self.max_epoch) or \
+                (self.max_step is not None and self._step >= self.max_step):
+            raise StopIteration
+
+        result = (self._epoch, self._step)
+        self._step += 1
+        if self.max_step is None or self._step >= self.max_step:
+            self._epoch += 1
+            self._step = 0
+
+        return result
+
+    def add_event_handler(self, event, handler):
+        # Simple event handler stub
+        pass
+
+    def print_logs(self, *args, **kwargs):
+        # Simple logging stub
+        print(*args, **kwargs)
+
+
+# VarScopeObject (already defined previously, but here's the complete version)
+class VarScopeObject:
+    def __init__(self, name=None, scope=None):
+        self._name = name
+        self._scope = scope or tf.compat.v1.get_variable_scope().name
+
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def variable_scope(self):
+        return self._scope
+
+
+# Minimal utils replacements
+def reopen_variable_scope(scope):
+    """Reopen a variable scope for reuse"""
+    return tf.compat.v1.variable_scope(scope, reuse=True)
+
+
+def get_default_session_or_error():
+    """Get the default TensorFlow session"""
+    session = tf.compat.v1.get_default_session()
+    if session is None:
+        raise RuntimeError('No default TensorFlow session is available.')
+    return session
+
+
+def ensure_variables_initialized(var_list=None):
+    """Ensure variables are initialized"""
+    if var_list is None:
+        var_list = tf.compat.v1.global_variables()
+
+    # Try to get initializer op
+    try:
+        init_op = tf.compat.v1.variables_initializer(var_list)
+        session = get_default_session_or_error()
+        session.run(init_op)
+    except:
+        # Fallback: let TensorFlow handle initialization
+        pass
+
+
+def get_variables_as_dict(scope=None, collection=tf.compat.v1.GraphKeys.GLOBAL_VARIABLES):
+    """Get variables as a dictionary"""
+    if scope is None:
+        vars_list = tf.compat.v1.get_collection(collection)
+    else:
+        vars_list = tf.compat.v1.get_collection(collection, scope=scope)
+
+    return {var.name.split(':')[0]: var for var in vars_list}
+
+
 
 __all__ = ['Trainer']
 

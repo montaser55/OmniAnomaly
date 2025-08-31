@@ -5,14 +5,131 @@ import tensorflow as tf
 import tfsnippet as spt
 from tensorflow.python.ops.linalg.linear_operator_identity import LinearOperatorIdentity
 from tensorflow_probability.python.distributions import LinearGaussianStateSpaceModel, MultivariateNormalDiag
-from tfsnippet.distributions import Normal
-from tfsnippet.utils import VarScopeObject, reopen_variable_scope
-from tfsnippet.variational import VariationalInference
+# from tfsnippet.distributions import Normal
+# from tfsnippet.utils import VarScopeObject, reopen_variable_scope
+# from tfsnippet.variational import VariationalInference
 
 from omni_anomaly.recurrent_distribution import RecurrentDistribution
 from omni_anomaly.vae import Lambda, VAE
 from omni_anomaly.wrapper import TfpDistribution, softplus_std, rnn, wrap_params_net
 
+
+class Normal:
+    """Minimal replacement for tfsnippet.distributions.Normal"""
+
+    def __init__(self, mean, std, is_reparameterized=True, **kwargs):
+        self.mean = mean
+        self.std = std
+        self._is_reparameterized = is_reparameterized
+        self._tfp_dist = tfp.distributions.Normal(loc=mean, scale=std, **kwargs)
+
+    @property
+    def is_reparameterized(self):
+        return self._is_reparameterized
+
+    @property
+    def is_continuous(self):
+        return True
+
+    def sample(self, n_samples=None, **kwargs):
+        if n_samples is not None:
+            samples = self._tfp_dist.sample(n_samples, **kwargs)
+        else:
+            samples = self._tfp_dist.sample(**kwargs)
+        return samples
+
+    def log_prob(self, value, **kwargs):
+        return self._tfp_dist.log_prob(value, **kwargs)
+
+    def prob(self, value, **kwargs):
+        return tf.exp(self.log_prob(value, **kwargs))
+
+
+# ==================== Utils (already defined, but included for completeness) ====================
+class VarScopeObject:
+    """Minimal replacement for tfsnippet.utils.VarScopeObject"""
+
+    def __init__(self, name=None, scope=None):
+        self._name = name
+        self._scope = scope or tf.compat.v1.get_variable_scope().name
+
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def variable_scope(self):
+        return self._scope
+
+
+def reopen_variable_scope(scope):
+    """Reopen a variable scope for reuse"""
+    return tf.compat.v1.variable_scope(scope, reuse=True)
+
+
+# ==================== Variational Inference Replacement ====================
+class VariationalInference:
+    """Minimal replacement for tfsnippet.variational.VariationalInference"""
+
+    def __init__(self, latent_log_joint, latent_log_probs, axis=None):
+        self.latent_log_joint = latent_log_joint
+        self.latent_log_probs = latent_log_probs
+        self.axis = axis
+
+        # Compute ELBO (Evidence Lower Bound)
+        self.log_likelihood = latent_log_joint
+        self.kl_divergence = self._compute_kl_divergence()
+        self.elbo = self.log_likelihood - self.kl_divergence
+        self.loss = -self.elbo  # Negative ELBO for minimization
+
+    def _compute_kl_divergence(self):
+        """Compute KL divergence between variational and prior distributions"""
+        if isinstance(self.latent_log_probs, dict):
+            # Sum KL divergences for multiple latent variables
+            kl_terms = []
+            for log_q, log_p in self.latent_log_probs.values():
+                kl_terms.append(log_q - log_p)
+            return tf.add_n(kl_terms)
+        else:
+            # Single latent variable case
+            log_q, log_p = self.latent_log_probs
+            return log_q - log_p
+
+    @property
+    def training_loss(self):
+        """Get the training loss (negative ELBO)"""
+        return self.loss
+
+    def reparameterized(self, *args, **kwargs):
+        """Stub for reparameterized training - returns the loss directly"""
+        return self.loss
+
+    def sgvb(self, *args, **kwargs):
+        """Stub for SGVB training - returns the loss directly"""
+        return self.loss
+
+    def reinforce(self, *args, **kwargs):
+        """Stub for REINFORCE training - returns the loss directly"""
+        return self.loss
+
+    def add_summary(self, name, value, *args, **kwargs):
+        """Simple summary addition"""
+        tf.summary.scalar(name, value, *args, **kwargs)
+
+    def __repr__(self):
+        return f"VariationalInference(elbo={self.elbo}, loss={self.loss})"
+
+
+# ==================== Helper functions for variational inference ====================
+def vi_objective(latent_log_joint, latent_log_probs, axis=None):
+    """Helper function to create VariationalInference objective"""
+    return VariationalInference(latent_log_joint, latent_log_probs, axis)
+
+
+def build_vi_objective(latent_log_joint, latent_log_probs, axis=None):
+    """Alternative helper function for VI objective"""
+    vi = VariationalInference(latent_log_joint, latent_log_probs, axis)
+    return vi.training_loss
 
 class OmniAnomaly(VarScopeObject):
     def __init__(self, config, name=None, scope=None):
