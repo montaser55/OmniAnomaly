@@ -2,7 +2,7 @@
 from functools import partial
 
 import tensorflow as tf
-import tfsnippet as spt
+# import tfsnippet as spt
 from tensorflow.python.ops.linalg.linear_operator_identity import LinearOperatorIdentity
 from tensorflow_probability.python.distributions import LinearGaussianStateSpaceModel, MultivariateNormalDiag
 # from tfsnippet.distributions import Normal
