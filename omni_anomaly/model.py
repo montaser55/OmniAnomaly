@@ -131,14 +131,47 @@ def build_vi_objective(latent_log_joint, latent_log_probs, axis=None):
     vi = VariationalInference(latent_log_joint, latent_log_probs, axis)
     return vi.training_loss
 
+
+def planar_normalizing_flows_tfp(n_layers, name='planar_flow'):
+    """
+    Alternative implementation using TensorFlow Probability's AffineScalar bijector
+    """
+    from tensorflow_probability import bijectors as tfb
+
+    # Create a chain of simple affine transformations (simplified version)
+    bijectors = []
+    for i in range(n_layers):
+        with tf.compat.v1.variable_scope(f'{name}_layer_{i}'):
+            # Trainable parameters for each flow layer
+            scale = tf.compat.v1.get_variable('scale', shape=[1],
+                                              initializer=tf.initializers.constant(1.0))
+            shift = tf.compat.v1.get_variable('shift', shape=[1],
+                                              initializer=tf.initializers.zeros())
+
+            # Create affine transformation
+            bijector = tfb.AffineScalar(shift=shift, scale=scale)
+            bijectors.append(bijector)
+
+    # Chain all bijectors together
+    flow_bijector = tfb.Chain(bijectors)
+
+    return flow_bijector
+
+
+# ==================== Usage in your code ====================
+# In your model's __init__ method, replace:
+
+
 class OmniAnomaly(VarScopeObject):
     def __init__(self, config, name=None, scope=None):
         self.config = config
         super(OmniAnomaly, self).__init__(name=name, scope=scope)
         with reopen_variable_scope(self.variable_scope):
             if config.posterior_flow_type == 'nf':
-                self._posterior_flow = spt.layers.planar_normalizing_flows(
-                    config.nf_layers, name='posterior_flow')
+                # self._posterior_flow = spt.layers.planar_normalizing_flows(
+                #     config.nf_layers, name='posterior_flow')
+                self._posterior_flow = planar_normalizing_flows_tfp(config.nf_layers, name='posterior_flow')
+
             else:
                 self._posterior_flow = None
             self._window_length = config.window_length
