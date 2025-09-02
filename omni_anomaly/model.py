@@ -134,30 +134,77 @@ def build_vi_objective(latent_log_joint, latent_log_probs, axis=None):
     return vi.training_loss
 
 
-def planar_normalizing_flows_tfp(n_layers, name='planar_flow'):
+def planar_normalizing_flows_custom(num_flows, name='planar_normalizing_flows'):
     """
-    Alternative implementation using TensorFlow Probability's AffineScalar bijector
+    Custom implementation of planar normalizing flows to replace spt.layers.planar_normalizing_flows
     """
-    from tensorflow_probability import bijectors as tfb
+    flows = []
 
-    # Create a chain of simple affine transformations (simplified version)
-    bijectors = []
-    for i in range(n_layers):
-        with tf.compat.v1.variable_scope(f'{name}_layer_{i}'):
-            # Trainable parameters for each flow layer
-            scale = tf.compat.v1.get_variable('scale', shape=[1],
-                                              initializer=tf.initializers.constant(1.0))
-            shift = tf.compat.v1.get_variable('shift', shape=[1],
-                                              initializer=tf.initializers.zeros())
+    # Use a unique scope name to avoid conflicts
+    with tf.compat.v1.variable_scope(name, reuse=tf.compat.v1.AUTO_REUSE):
+        for i in range(num_flows):
+            # Create a unique scope for each layer
+            layer_name = '{}_layer_{}'.format(name, i)
+            with tf.compat.v1.variable_scope(layer_name, reuse=tf.compat.v1.AUTO_REUSE):
+                # Define variables for each flow layer
+                scale = tf.compat.v1.get_variable(
+                    'scale',
+                    shape=[1],
+                    initializer=tf.compat.v1.constant_initializer(1.0)
+                )
+                shift = tf.compat.v1.get_variable(
+                    'shift',
+                    shape=[1],
+                    initializer=tf.compat.v1.constant_initializer(0.0)
+                )
+                u = tf.compat.v1.get_variable(
+                    'u',
+                    shape=[1],
+                    initializer=tf.compat.v1.constant_initializer(1.0)
+                )
+                w = tf.compat.v1.get_variable(
+                    'w',
+                    shape=[1],
+                    initializer=tf.compat.v1.constant_initializer(1.0)
+                )
+                b = tf.compat.v1.get_variable(
+                    'b',
+                    shape=[1],
+                    initializer=tf.compat.v1.constant_initializer(0.0)
+                )
 
-            # Create affine transformation
-            bijector = tfb.AffineScalar(shift=shift, scale=scale)
-            bijectors.append(bijector)
+            # Create closure to capture the current variables
+            def make_flow_fn(scale, shift, u, w, b):
+                def flow_fn(z, log_det_jacobian):
+                    """
+                    Planar flow transformation: z' = z + u * tanh(w^T z + b)
+                    """
+                    # Compute the transformation
+                    linear_term = tf.reduce_sum(w * z, axis=-1, keepdims=True) + b
+                    activation = tf.tanh(linear_term)
+                    transformation = u * activation + shift
+                    z_transformed = z + scale * transformation
 
-    # Chain all bijectors together
-    flow_bijector = tfb.Chain(bijectors)
+                    # Compute log determinant of Jacobian
+                    psi = (1 - tf.square(activation)) * w
+                    det_jacobian = 1 + scale * tf.reduce_sum(u * psi, axis=-1, keepdims=True)
+                    log_det_jacobian += tf.reduce_sum(tf.math.log(tf.abs(det_jacobian) + 1e-8), axis=-1)
 
-    return flow_bijector
+                    return z_transformed, log_det_jacobian
+
+                return flow_fn
+
+            flows.append(make_flow_fn(scale, shift, u, w, b))
+
+    def apply_flows(z, log_det_jacobian=0.0):
+        """
+        Apply all flows in sequence
+        """
+        for flow in flows:
+            z, log_det_jacobian = flow(z, log_det_jacobian)
+        return z, log_det_jacobian
+
+    return apply_flows
 
 
 # ==================== Usage in your code ====================
@@ -172,8 +219,8 @@ class OmniAnomaly(VarScopeObject):
             if config.posterior_flow_type == 'nf':
                 # self._posterior_flow = spt.layers.planar_normalizing_flows(
                 #     config.nf_layers, name='posterior_flow')
-                self._posterior_flow = planar_normalizing_flows_tfp(config.nf_layers, name='posterior_flow')
-
+                self._posterior_flow = planar_normalizing_flows_custom(
+                    config.nf_layers, name='posterior_flow')
             else:
                 self._posterior_flow = None
             self._window_length = config.window_length
