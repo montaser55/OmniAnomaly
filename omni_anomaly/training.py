@@ -195,15 +195,7 @@ class Trainer(VarScopeObject):
         self._lr_anneal_factor = lr_anneal_factor
 
         # build the trainer
-        with reopen_variable_scope(self.variable_scope):
-            # the global step for this model
-            # self._global_step = tf.get_variable(
-            self._global_step = tf.compat.v1.get_variable(
-                dtype=tf.int64, name='global_step', trainable=False,
-                # initializer=tf.constant(0, dtype=tf.int64)
-                initializer=tf.compat.v1.constant(0, dtype=tf.int64)
-            )
-
+        with tf.compat.v1.variable_scope(self.variable_scope, reuse=tf.compat.v1.AUTO_REUSE):
             # input placeholders
             # self._input_x = tf.placeholder(
             self._input_x = tf.compat.v1.placeholder(
