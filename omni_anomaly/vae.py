@@ -1,6 +1,10 @@
 # -*- coding: utf-8 -*-
 import tensorflow.compat.v1 as tf
+
 tf.compat.v1.disable_v2_behavior()
+import tensorflow_probability as tfp
+
+tfd = tfp.distributions
 
 class BayesianNet:
     def __init__(self):
@@ -43,6 +47,45 @@ class Distribution:
 
     def log_prob(self, given, **kwargs):
         raise NotImplementedError
+
+
+class TfpDistribution(Distribution):
+    """
+    A wrapper for TFP distributions that inherits from the custom Distribution class
+    """
+
+    def __init__(self, distribution):
+        super().__init__()
+        if not isinstance(distribution, tfd.Distribution):
+            raise TypeError('`distribution` is not an instance of `tfp.distributions.Distribution`')
+        self._distribution = distribution
+
+        # Set the reparameterization flag based on TFP distribution
+        self._is_reparameterized = (
+                hasattr(distribution, 'reparameterization_type') and
+                distribution.reparameterization_type == tfd.FULLY_REPARAMETERIZED
+        )
+
+    def get_value_shape(self):
+        return self._distribution.event_shape
+
+    def get_batch_shape(self):
+        return self._distribution.batch_shape
+
+    def sample(self, n_samples=None, **kwargs):
+        if n_samples is not None:
+            return self._distribution.sample(n_samples)
+        return self._distribution.sample()
+
+    def log_prob(self, given, **kwargs):
+        return self._distribution.log_prob(given)
+
+    # Delegate other methods to the underlying distribution
+    def __getattr__(self, name):
+        return getattr(self._distribution, name)
+
+    def __repr__(self):
+        return f'TfpDistribution({repr(self._distribution)})'
 
 
 class StochasticTensor:
@@ -99,12 +142,18 @@ class VarScopeObject:
     def variable_scope(self):
         return self._scope
 
+
 class VAE(VarScopeObject):
     def __init__(self, p_z, p_x_given_z, q_z_given_x, h_for_p_x, h_for_q_z,
                  z_group_ndims=1, x_group_ndims=1, is_reparameterized=None,
                  name=None, scope=None):
-        if not isinstance(p_z, Distribution):
-            raise TypeError('`p_z` must be an instance of `Distribution`')
+        # Check if p_z is either a custom Distribution or a TFP distribution
+        is_custom_dist = isinstance(p_z, Distribution)
+        is_tfp_dist = hasattr(p_z, '_distribution') and isinstance(p_z._distribution, tfd.Distribution)
+
+        if not (is_custom_dist or is_tfp_dist):
+            raise TypeError('`p_z` must be an instance of `Distribution` or a TFP distribution wrapper')
+
         if not callable(h_for_p_x):
             raise TypeError('`h_for_p_x` must be an instance of `Module` or '
                             'a callable object')
@@ -177,7 +226,11 @@ class VAE(VarScopeObject):
             z_params = self.h_for_q_z(x)
         with tf.compat.v1.variable_scope('q_z_given_x'):
             q_z_given_x = self.q_z_given_x(**z_params)
-            assert (isinstance(q_z_given_x, Distribution))
+            # Check if it's either a custom Distribution or TFP distribution
+            is_custom = isinstance(q_z_given_x, Distribution)
+            is_tfp = hasattr(q_z_given_x, '_distribution') and isinstance(q_z_given_x._distribution, tfd.Distribution)
+            if not (is_custom or is_tfp):
+                raise AssertionError('q_z_given_x must be an instance of Distribution or TFP distribution wrapper')
         with tf.name_scope('z'):
             z = net.add('z', q_z_given_x, n_samples=n_z,
                         group_ndims=self.z_group_ndims,
@@ -197,7 +250,11 @@ class VAE(VarScopeObject):
             x_params = self.h_for_p_x(z)
         with tf.compat.v1.variable_scope('p_x_given_z'):
             p_x_given_z = self.p_x_given_z(**x_params)
-            assert (isinstance(p_x_given_z, Distribution))
+            # Check if it's either a custom Distribution or TFP distribution
+            is_custom = isinstance(p_x_given_z, Distribution)
+            is_tfp = hasattr(p_x_given_z, '_distribution') and isinstance(p_x_given_z._distribution, tfd.Distribution)
+            if not (is_custom or is_tfp):
+                raise AssertionError('p_x_given_z must be an instance of Distribution or TFP distribution wrapper')
         with tf.name_scope('x'):
             x = net.add('x', p_x_given_z, n_samples=n_x,
                         group_ndims=self.x_group_ndims)
