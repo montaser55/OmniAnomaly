@@ -76,7 +76,7 @@ def get_data(dataset, max_train_size=None, max_test_size=None, print_log=True, d
         test_data = preprocess(test_data)
     print("train set shape: ", train_data.shape)
     print("test set shape: ", test_data.shape)
-    print("test set label shape: ", test_label.shape)
+    print("test set label shape: ", test_label.shape if test_label is not None else "None")
     return (train_data, None), (test_data, test_label)
 
 
@@ -91,7 +91,7 @@ def preprocess(df):
 
     if np.any(sum(np.isnan(df)) != 0):
         print('Data contains null values. Will be replaced with 0')
-        df = np.nan_to_num()
+        df = np.nan_to_num(df)  # Fixed: need to pass df as argument
 
     # normalize data
     df = MinMaxScaler().fit_transform(df)
@@ -157,7 +157,7 @@ class BatchSlidingWindow(object):
             raise ValueError('`array_size` must be at least as large as '
                              '`window_size`')
         if excludes is not None:
-            excludes = np.asarray(excludes, dtype=np.bool)
+            excludes = np.asarray(excludes, dtype=bool)  # Changed from np.bool to bool
             expected_shape = (array_size,)
             if excludes.shape != expected_shape:
                 raise ValueError('The shape of `excludes` is expected to be '
@@ -168,7 +168,7 @@ class BatchSlidingWindow(object):
         if excludes is not None:
             mask = np.logical_not(excludes)
         else:
-            mask = np.ones([array_size], dtype=np.bool)
+            mask = np.ones([array_size], dtype=bool)  # Changed from np.bool to bool
         mask[: window_size - 1] = False
         where_excludes = np.where(excludes)[0]
         for k in range(1, window_size):

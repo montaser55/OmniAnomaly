@@ -4,6 +4,8 @@ import time
 import numpy as np
 import six
 import tensorflow as tf
+tf.compat.v1.disable_v2_behavior()
+
 # from tfsnippet.utils import (VarScopeObject, get_default_session_or_error,
 #                              reopen_variable_scope)
 
@@ -131,9 +133,9 @@ class Predictor(VarScopeObject):
 
         with reopen_variable_scope(self.variable_scope):
             # input placeholders
-            self._input_x = tf.placeholder(
+            self._input_x = tf.compat.v1.placeholder(
                 dtype=tf.float32, shape=[None, model.window_length, model.x_dims], name='input_x')
-            self._input_y = tf.placeholder(
+            self._input_y = tf.compat.v1.placeholder(
                 dtype=tf.int32, shape=[None, model.window_length], name='input_y')
 
             # outputs of interest

@@ -11,9 +11,7 @@ import json
 
 import numpy as np
 import tensorflow as tf
-# from tfsnippet.examples.utils import MLResults, print_with_title
-# from tfsnippet.scaffold import VariableSaver
-# from tfsnippet.utils import get_variables_as_dict, register_config_arguments, Config
+tf.compat.v1.disable_v2_behavior()
 
 from omni_anomaly.eval_methods import pot_eval, bf_search
 from omni_anomaly.model import OmniAnomaly
@@ -193,6 +191,7 @@ def parse_config_args(config, args=None):
 
     return config
 
+
 class ExpConfig(Config):
     # dataset configuration
     dataset = "machine-1-1"
@@ -258,6 +257,11 @@ class ExpConfig(Config):
 
 
 def main():
+    # Verify that v2 behaviors are disabled
+    print(f"TensorFlow version: {tf.__version__}")
+    print(f"Executing eagerly: {tf.executing_eagerly()}")
+    print(f"V2 behaviors disabled: {not tf.compat.v1.executing_eagerly_outside_functions()}")
+
     logging.basicConfig(
         level='INFO',
         format='%(asctime)s [%(levelname)s] %(name)s: %(message)s'
@@ -269,7 +273,7 @@ def main():
                  test_start=config.test_start)
 
     # construct the model under `variable_scope` named 'model'
-    with tf.variable_scope('model') as model_vs:
+    with tf.compat.v1.variable_scope('model') as model_vs:
         model = OmniAnomaly(config=config, name="model")
 
         # construct the trainer
@@ -288,7 +292,8 @@ def main():
         predictor = Predictor(model, batch_size=config.batch_size, n_z=config.test_n_z,
                               last_point_only=True)
 
-        with tf.Session().as_default():
+        # Use tf.compat.v1.Session for explicit session management
+        with tf.compat.v1.Session().as_default():
 
             if config.restore_dir is not None:
                 # Restore variables from `save_dir`.
@@ -370,7 +375,6 @@ def main():
 
 
 if __name__ == '__main__':
-
     # get config obj
     config = ExpConfig()
 

@@ -5,6 +5,7 @@ import numpy as np
 import six
 import tensorflow as tf
 
+tf.compat.v1.disable_v2_behavior()
 
 # Replace tfsnippet imports with minimal implementations
 # from tfsnippet.scaffold import TrainLoop

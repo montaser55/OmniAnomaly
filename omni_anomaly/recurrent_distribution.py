@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
 import tensorflow as tf
+tf.compat.v1.disable_v2_behavior()
+import tensorflow_probability as tfp
+
 # from tfsnippet import Distribution, Normal
 
 
@@ -158,7 +161,7 @@ class Normal(Distribution):
                     self.distribution = distribution
 
                 def log_prob(self):
-                    return distribution.log_prob(self.tensor)
+                    return self.distribution.log_prob(self.tensor)
 
             result = SampleResult(samples, self)
 
@@ -177,6 +180,25 @@ class Normal(Distribution):
 
     def __repr__(self):
         return f"Normal(mean={self.mean}, std={self.std})"
+
+
+# Minimal StochasticTensor replacement
+class StochasticTensor:
+    def __init__(self, tensor, distribution, n_samples=1, group_ndims=0, is_reparameterized=None):
+        self.tensor = tensor
+        self.distribution = distribution
+        self.n_samples = n_samples
+        self.group_ndims = group_ndims
+        self.is_reparameterized = is_reparameterized if is_reparameterized is not None else distribution.is_reparameterized
+        self._self_prob = None
+
+    def log_prob(self):
+        return self.distribution.log_prob(self.tensor)
+
+    def prob(self):
+        if self._self_prob is None:
+            self._self_prob = tf.exp(self.log_prob())
+        return self._self_prob
 
 
 class RecurrentDistribution(Distribution):
@@ -216,7 +238,7 @@ class RecurrentDistribution(Distribution):
         input_q_n = tf.broadcast_to(input_q_n,
                                     [tf.shape(z_previous)[0], tf.shape(input_q_n)[0], input_q_n.shape[1]])
         input_q = tf.concat([input_q_n, z_previous], axis=-1)
-        mu_q = self.mean_q_mlp(input_q, reuse=tf.AUTO_REUSE)  # n_sample * batch_size * z_dim
+        mu_q = self.mean_q_mlp(input_q, reuse=tf.compat.v1.AUTO_REUSE)  # n_sample * batch_size * z_dim
 
         std_q = self.std_q_mlp(input_q)  # n_sample * batch_size * z_dim
 
@@ -227,21 +249,19 @@ class RecurrentDistribution(Distribution):
 
         return z_n, mu_q, std_q
 
-    # @global_reuse
     def log_prob_step(self, _, t):
-
         given_n, input_q_n = t
         if len(given_n.shape) > 2:
             input_q_n = tf.broadcast_to(input_q_n,
                                         [tf.shape(given_n)[0], tf.shape(input_q_n)[0], input_q_n.shape[1]])
         input_q = tf.concat([given_n, input_q_n], axis=-1)
-        mu_q = self.mean_q_mlp(input_q, reuse=tf.AUTO_REUSE)
+        mu_q = self.mean_q_mlp(input_q, reuse=tf.compat.v1.AUTO_REUSE)
 
         std_q = self.std_q_mlp(input_q)
-        logstd_q = tf.log(std_q)
+        logstd_q = tf.math.log(std_q)
         precision = tf.exp(-2 * logstd_q)
         if self._check_numerics:
-            precision = tf.check_numerics(precision, "precision")
+            precision = tf.debugging.check_numerics(precision, "precision")
         log_prob_n = - 0.9189385332046727 - logstd_q - 0.5 * precision * tf.square(tf.minimum(tf.abs(given_n - mu_q),
                                                                                               1e8))
         return log_prob_n
@@ -263,8 +283,6 @@ class RecurrentDistribution(Distribution):
 
     def sample(self, n_samples=1024, is_reparameterized=None, group_ndims=0, compute_density=False,
                name=None):
-
-        from tfsnippet.stochastic import StochasticTensor
         if n_samples is None:
             n_samples = 1
             n_samples_is_none = True
@@ -274,32 +292,32 @@ class RecurrentDistribution(Distribution):
             noise = self.normal.sample(n_samples=n_samples)
 
             noise = tf.transpose(noise, [1, 0, 2])  # window_length * n_samples * z_dim
-            noise = tf.truncated_normal(tf.shape(noise))
+            noise = tf.random.truncated_normal(tf.shape(noise))
 
             time_indices_shape = tf.convert_to_tensor([n_samples, tf.shape(self.input_q)[1], self.z_dim])
 
-            samples = tf.scan(fn=self.sample_step,
-                              elems=(noise, self.input_q),
-                              initializer=(tf.zeros(time_indices_shape),
-                                           tf.zeros(time_indices_shape),
-                                           tf.ones(time_indices_shape)),
-                              back_prop=False
-                              )[0]  # time_step * n_samples * batch_size * z_dim
+            samples = tf.compat.v1.scan(fn=self.sample_step,
+                                        elems=(noise, self.input_q),
+                                        initializer=(tf.zeros(time_indices_shape),
+                                                     tf.zeros(time_indices_shape),
+                                                     tf.ones(time_indices_shape)),
+                                        back_prop=False
+                                        )[0]  # time_step * n_samples * batch_size * z_dim
 
             samples = tf.transpose(samples, [1, 2, 0, 3])  # n_samples * batch_size * time_step *  z_dim
 
             if n_samples_is_none:
                 t = StochasticTensor(
-                    distribution=self,
                     tensor=tf.reduce_mean(samples, axis=0),
+                    distribution=self,
                     n_samples=1,
                     group_ndims=group_ndims,
                     is_reparameterized=self.is_reparameterized
                 )
             else:
                 t = StochasticTensor(
-                    distribution=self,
                     tensor=samples,
+                    distribution=self,
                     n_samples=n_samples,
                     group_ndims=group_ndims,
                     is_reparameterized=self.is_reparameterized
@@ -318,11 +336,11 @@ class RecurrentDistribution(Distribution):
             else:
                 time_indices_shape = tf.convert_to_tensor([tf.shape(self.input_q)[1], self.z_dim])
                 given = tf.transpose(given, [1, 0, 2])
-            log_prob = tf.scan(fn=self.log_prob_step,
-                               elems=(given, self.input_q),
-                               initializer=tf.zeros(time_indices_shape),
-                               back_prop=False
-                               )
+            log_prob = tf.compat.v1.scan(fn=self.log_prob_step,
+                                         elems=(given, self.input_q),
+                                         initializer=tf.zeros(time_indices_shape),
+                                         back_prop=False
+                                         )
             if len(given.shape) > 3:
                 log_prob = tf.transpose(log_prob, [1, 2, 0, 3])
             else:

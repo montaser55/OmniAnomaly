@@ -2,6 +2,7 @@
 import logging
 
 import tensorflow as tf
+tf.compat.v1.disable_v2_behavior()
 import tensorflow_probability as tfp
 # from tfsnippet.distributions import Distribution
 
@@ -120,7 +121,7 @@ class TfpDistribution(Distribution):
 
 
 def softplus_std(inputs, units, epsilon, name):
-    return tf.nn.softplus(tf.layers.dense(inputs, units, name=name, reuse=tf.AUTO_REUSE)) + epsilon
+    return tf.nn.softplus(tf.compat.v1.layers.dense(inputs, units, name=name, reuse=tf.compat.v1.AUTO_REUSE)) + epsilon
 
 
 def rnn(x,
@@ -131,8 +132,8 @@ def rnn(x,
         dense_dim=200,
         time_axis=1,
         name='rnn'):
-    from tensorflow.contrib import rnn
-    with tf.variable_scope(name, reuse=tf.AUTO_REUSE):
+    # Use compat.v1 for RNN components
+    with tf.compat.v1.variable_scope(name, reuse=tf.compat.v1.AUTO_REUSE):
         if len(x.shape) == 4:
             x = tf.reduce_mean(x, axis=0)
         elif len(x.shape) != 3:
@@ -142,30 +143,29 @@ def rnn(x,
         if rnn_cell == 'LSTM':
             # Define lstm cells with TensorFlow
             # Forward direction cell
-            fw_cell = rnn.BasicLSTMCell(rnn_num_hidden,
+            fw_cell = tf.compat.v1.nn.rnn_cell.BasicLSTMCell(rnn_num_hidden,
                                         forget_bias=1.0)
         elif rnn_cell == "GRU":
-            fw_cell = tf.nn.rnn_cell.GRUCell(rnn_num_hidden)
+            fw_cell = tf.compat.v1.nn.rnn_cell.GRUCell(rnn_num_hidden)
         elif rnn_cell == 'Basic':
-            fw_cell = tf.nn.rnn_cell.BasicRNNCell(rnn_num_hidden)
+            fw_cell = tf.compat.v1.nn.rnn_cell.BasicRNNCell(rnn_num_hidden)
         else:
             raise ValueError("rnn_cell must be LSTM or GRU")
 
         # Get lstm cell output
-
         try:
-            outputs, _ = rnn.static_rnn(fw_cell, x, dtype=tf.float32)
+            outputs, _ = tf.compat.v1.nn.static_rnn(fw_cell, x, dtype=tf.float32)
         except Exception:  # Old TensorFlow version only returns outputs not states
-            outputs = rnn.static_rnn(fw_cell, x, dtype=tf.float32)
+            outputs = tf.compat.v1.nn.static_rnn(fw_cell, x, dtype=tf.float32)
         outputs = tf.stack(outputs, axis=time_axis)
         for i in range(hidden_dense):
-            outputs = tf.layers.dense(outputs, dense_dim)
+            outputs = tf.compat.v1.layers.dense(outputs, dense_dim)
         return outputs
     # return size: (batch_size, window_length, rnn_num_hidden)
 
 
 def wrap_params_net(inputs, h_for_dist, mean_layer, std_layer):
-    with tf.variable_scope('hidden', reuse=tf.AUTO_REUSE):
+    with tf.compat.v1.variable_scope('hidden', reuse=tf.compat.v1.AUTO_REUSE):
         h = h_for_dist(inputs)
     return {
         'mean': mean_layer(h),
@@ -174,7 +174,7 @@ def wrap_params_net(inputs, h_for_dist, mean_layer, std_layer):
 
 
 def wrap_params_net_srnn(inputs, h_for_dist):
-    with tf.variable_scope('hidden', reuse=tf.AUTO_REUSE):
+    with tf.compat.v1.variable_scope('hidden', reuse=tf.compat.v1.AUTO_REUSE):
         h = h_for_dist(inputs)
     return {
         'input_q': h
