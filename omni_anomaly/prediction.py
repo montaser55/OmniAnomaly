@@ -3,7 +3,7 @@ import time
 
 import numpy as np
 import six
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 tf.compat.v1.disable_v2_behavior()
 
 # from tfsnippet.utils import (VarScopeObject, get_default_session_or_error,

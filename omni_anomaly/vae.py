@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 tf.compat.v1.disable_v2_behavior()
 
 class BayesianNet:
