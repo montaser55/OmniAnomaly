@@ -1,7 +1,11 @@
 # -*- coding: utf-8 -*-
-
-from .tf_compat_patch import tf_compat as tf
+import omni_anomaly.tf_compat
+import tensorflow.compat.v1 as tf
 tf.compat.v1.disable_v2_behavior()
+
+from omni_anomaly.tf_compat import apply_tf_monkey_patches
+apply_tf_monkey_patches()
+
 from tfsnippet.bayes import BayesianNet
 from tfsnippet.distributions import Distribution
 from tfsnippet.stochastic import StochasticTensor, validate_n_samples_arg

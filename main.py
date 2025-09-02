@@ -10,7 +10,8 @@ from pprint import pformat, pprint
 import json
 
 import numpy as np
-import omni_anomaly.tf_compat as tf
+import tensorflow as tf
+
 tf.compat.v1.disable_v2_behavior()
 
 from omni_anomaly.eval_methods import pot_eval, bf_search
