@@ -1,5 +1,5 @@
 import tensorflow as tf
-tf.disable_v2_behavior()   # turn off TF2.x behaviors (eager execution, etc.)
+tf.compat.v1.disable_v2_behavior()   # turn off TF2.x behaviors (eager execution, etc.)
 
 # Check GPU availability
 print("=== GPU Check ===")
