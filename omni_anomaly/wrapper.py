@@ -2,73 +2,38 @@
 import logging
 
 import tensorflow.compat.v1 as tf
+
 tf.compat.v1.disable_v2_behavior()
 import tensorflow_probability as tfp
+
+tfd = tfp.distributions
+
+# Remove the custom Distribution class and use TFP's Distribution directly
 # from tfsnippet.distributions import Distribution
 
-class Distribution:
-
-    def __init__(self):
-        self._is_continuous = True
-        self._is_reparameterized = False
-
-    @property
-    def is_continuous(self):
-        return self._is_continuous
-
-    @property
-    def is_reparameterized(self):
-        return self._is_reparameterized
-
-    @property
-    def value_shape(self):
-        return self.get_value_shape()
-
-    def get_value_shape(self):
-        raise NotImplementedError
-
-    @property
-    def batch_shape(self):
-        return self.get_batch_shape()
-
-    def get_batch_shape(self):
-        raise NotImplementedError
-
-    def sample(self, n_samples=None, is_reparameterized=None, group_ndims=0, compute_density=False, name=None):
-        raise NotImplementedError
-
-    def log_prob(self, given, group_ndims=0, name=None):
-        raise NotImplementedError
+# Remove the entire custom Distribution class since we'll use TFP's directly
 
 
-class TfpDistribution(Distribution):
+
+class TfpDistribution:
     """
-    A wrapper class for `tfp.distributions.Distribution`
+    A simplified wrapper class for `tfp.distributions.Distribution`
+    that provides compatibility interface
     """
-
-    @property
-    def is_continuous(self):
-        return self._is_continuous
 
     def __init__(self, distribution):
-        if not isinstance(distribution, tfp.distributions.Distribution):
-            raise TypeError('`distribution` is not an instance of `tfp.'
-                            'distributions.Distribution`')
-        super(TfpDistribution, self).__init__()
+        if not isinstance(distribution, tfd.Distribution):
+            raise TypeError('`distribution` is not an instance of `tfp.distributions.Distribution`')
         self._distribution = distribution
-        self._is_continuous = True
-        self._is_reparameterized = self._distribution.reparameterization_type is tfp.distributions.FULLY_REPARAMETERIZED
-
-    def __repr__(self):
-        return 'Distribution({!r})'.format(self._distribution)
 
     @property
-    def dtype(self):
-        return self._distribution.dtype
+    def is_continuous(self):
+        return True  # Most TFP distributions are continuous
 
     @property
     def is_reparameterized(self):
-        return self._is_reparameterized
+        return (hasattr(self._distribution, 'reparameterization_type') and
+                self._distribution.reparameterization_type == tfd.FULLY_REPARAMETERIZED)
 
     @property
     def value_shape(self):
@@ -82,42 +47,42 @@ class TfpDistribution(Distribution):
         return self._distribution.batch_shape
 
     def get_batch_shape(self):
-        return self._distribution.batch_shape()
+        return self._distribution.batch_shape
 
-    def sample(self, n_samples=None, is_reparameterized=None, group_ndims=0, compute_density=False,
-               name=None):
-        class SimpleStochasticTensor:
-            def __init__(self, tensor, distribution, n_samples, group_ndims, is_reparameterized):
-                self.tensor = tensor
-                self.distribution = distribution
-                self.n_samples = n_samples
-                self.group_ndims = group_ndims
-                self.is_reparameterized = is_reparameterized
-                self._self_prob = None
+    def sample(self, n_samples=None, is_reparameterized=None, group_ndims=0, compute_density=False, name=None):
+        with tf.name_scope(name or 'sample'):
+            if n_samples is not None:
+                samples = self._distribution.sample(n_samples)
+            else:
+                samples = self._distribution.sample()
 
-            def log_prob(self):
-                return self.distribution.log_prob(self.tensor)
-        if n_samples is None or n_samples < 2:
-            n_samples = 2
-        with tf.name_scope(name=name, default_name='sample'):
-            samples = self._distribution.sample(n_samples)
-            samples = tf.reduce_mean(samples, axis=0)
-            t = SimpleStochasticTensor(
-                distribution=self,
-                tensor=samples,
-                n_samples=n_samples,
-                group_ndims=group_ndims,
-                is_reparameterized=self.is_reparameterized
-            )
+            # For compatibility, return an object with log_prob method
+            class SampleResult:
+                def __init__(self, tensor, distribution):
+                    self.tensor = tensor
+                    self.distribution = distribution
+
+                def log_prob(self):
+                    return self.distribution.log_prob(self.tensor)
+
+            result = SampleResult(samples, self)
+
             if compute_density:
-                with tf.name_scope('compute_prob_and_log_prob'):
-                    log_p = t.log_prob()
-                    t._self_prob = tf.exp(log_p)
-            return t
+                # Precompute log probability if requested
+                result._log_prob = self.log_prob(samples)
+
+            return result
 
     def log_prob(self, given, group_ndims=0, name=None):
-        with tf.name_scope(name=name, default_name='log_prob'):
+        with tf.name_scope(name or 'log_prob'):
             return self._distribution.log_prob(given)
+
+    # Delegate other methods to the underlying distribution
+    def __getattr__(self, name):
+        return getattr(self._distribution, name)
+
+    def __repr__(self):
+        return f'TfpDistribution({repr(self._distribution)})'
 
 
 def softplus_std(inputs, units, epsilon, name):
@@ -143,8 +108,7 @@ def rnn(x,
         if rnn_cell == 'LSTM':
             # Define lstm cells with TensorFlow
             # Forward direction cell
-            fw_cell = tf.compat.v1.nn.rnn_cell.BasicLSTMCell(rnn_num_hidden,
-                                        forget_bias=1.0)
+            fw_cell = tf.compat.v1.nn.rnn_cell.BasicLSTMCell(rnn_num_hidden, forget_bias=1.0)
         elif rnn_cell == "GRU":
             fw_cell = tf.compat.v1.nn.rnn_cell.GRUCell(rnn_num_hidden)
         elif rnn_cell == 'Basic':
