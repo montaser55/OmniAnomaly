@@ -1,14 +1,12 @@
 # -*- coding: utf-8 -*-
-import tf_compat_patch
 
-import tensorflow.compat.v1 as tf
+from tf_compat import tf_compat as tf
 tf.compat.v1.disable_v2_behavior()
 from tfsnippet.bayes import BayesianNet
 from tfsnippet.distributions import Distribution
 from tfsnippet.stochastic import StochasticTensor, validate_n_samples_arg
 from tfsnippet.utils import (instance_reuse, is_tensor_object,
                              reopen_variable_scope, VarScopeObject)
-from tfsnippet.variational import VariationalChain
 
 
 class VAE(VarScopeObject):
