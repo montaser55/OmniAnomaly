@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from tf_compat import tf_compat as tf
+from .tf_compat_patch import tf_compat as tf
 tf.compat.v1.disable_v2_behavior()
 from tfsnippet.bayes import BayesianNet
 from tfsnippet.distributions import Distribution
