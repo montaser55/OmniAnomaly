@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+import tf_compat_patch
+
 import tensorflow.compat.v1 as tf
 tf.compat.v1.disable_v2_behavior()
 from tfsnippet.bayes import BayesianNet
