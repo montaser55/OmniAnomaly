@@ -213,6 +213,48 @@ def comprehensive_tf1_patch():
     except Exception as e:
         print(f"Warning: Could not add additional RNN functions: {e}")
 
+    # Additional TF1 functions that might be needed
+    try:
+        # Tensor manipulation
+        tf.expand_dims = tf.expand_dims  # Should already exist
+        tf.squeeze = tf.squeeze  # Should already exist
+        tf.reshape = tf.reshape  # Should already exist
+        tf.transpose = tf.transpose  # Should already exist
+        tf.concat = tf.concat  # Should already exist
+        tf.stack = tf.stack  # Should already exist
+        tf.unstack = tf.unstack  # Should already exist
+        tf.split = tf.split  # Should already exist
+        tf.slice = tf.slice  # Should already exist
+        tf.gather = tf.gather  # Should already exist
+        tf.scatter_nd = tf.scatter_nd  # Should already exist
+
+        # Control flow
+        tf.cond = tf_v1.cond
+        tf.while_loop = tf_v1.while_loop
+        tf.case = tf_v1.case
+
+        # Additional commonly used functions
+        tf.stop_gradient = tf.stop_gradient  # Should already exist
+        tf.identity = tf.identity  # Should already exist
+        tf.cast = tf.cast  # Should already exist
+        tf.shape = tf.shape  # Should already exist
+        tf.size = tf.size  # Should already exist
+        tf.rank = tf.rank  # Should already exist
+
+        # Constants and utilities
+        tf.zeros = tf.zeros  # Should already exist
+        tf.ones = tf.ones  # Should already exist
+        tf.zeros_like = tf.zeros_like  # Should already exist
+        tf.ones_like = tf.ones_like  # Should already exist
+        tf.fill = tf.fill  # Should already exist
+        tf.constant = tf.constant  # Should already exist
+        tf.range = tf.range  # Should already exist
+        tf.linspace = tf.linspace  # Should already exist
+
+        print("✅ Additional TF1 utility functions verified")
+    except Exception as e:
+        print(f"Warning: Some utility functions may not be available: {e}")
+
     # Configure session
     try:
         config = tf_v1.ConfigProto()
