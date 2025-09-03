@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+
+import pre_import_patch
 import logging
 import os
 import pickle
@@ -12,7 +14,7 @@ import json
 import numpy as np
 import tensorflow as tf
 
-tf.compat.v1.disable_v2_behavior()
+# tf.compat.v1.disable_v2_behavior()
 
 from omni_anomaly.eval_methods import pot_eval, bf_search
 from omni_anomaly.model import OmniAnomaly
