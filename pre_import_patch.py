@@ -1,7 +1,7 @@
 # comprehensive_tf_patch.py
 """
 Comprehensive TensorFlow 1.x compatibility patch for tfsnippet
-Covers all the missing classes and functions.
+Covers all the missing classes and functions including rnn_cell.
 """
 import sys
 import types
@@ -12,6 +12,20 @@ def comprehensive_tf1_patch():
     """Most comprehensive TF1 compatibility patch"""
 
     print("Applying comprehensive TensorFlow 1.x compatibility patch...")
+
+    # Import TensorFlow first
+    import tensorflow as tf
+    import tensorflow.compat.v1 as tf_v1
+
+    print(f"TensorFlow version: {tf.__version__}")
+
+    # Configure TF1 behavior
+    tf_v1.disable_v2_behavior()
+    tf_v1.disable_eager_execution()
+
+    # Suppress warnings
+    warnings.filterwarnings('ignore', category=FutureWarning)
+    tf.get_logger().setLevel('ERROR')
 
     # Create contrib modules FIRST
     framework_module = types.ModuleType('tensorflow.contrib.framework')
@@ -49,25 +63,33 @@ def comprehensive_tf1_patch():
     sys.modules['tensorflow.contrib.framework'] = framework_module
     sys.modules['tensorflow.contrib.rnn'] = rnn_module
 
-    # Import TensorFlow
-    import tensorflow as tf
-    import tensorflow.compat.v1 as tf_v1
-
-    print(f"TensorFlow version: {tf.__version__}")
-
-    # Configure TF1 behavior
-    tf_v1.disable_v2_behavior()
-    tf_v1.disable_eager_execution()
-
-    # Suppress warnings
-    warnings.filterwarnings('ignore', category=FutureWarning)
-    tf.get_logger().setLevel('ERROR')
-
     # Link contrib modules to TensorFlow
     tf.contrib = contrib_module
     tf_v1.contrib = contrib_module
 
-    # Now populate the RNN module with actual functions
+    # *** CRITICAL FIX: Create rnn_cell module ***
+    rnn_cell_module = types.ModuleType('tensorflow.nn.rnn_cell')
+
+    # Populate rnn_cell with TF1 classes
+    try:
+        rnn_cell_module.BasicLSTMCell = tf_v1.nn.rnn_cell.BasicLSTMCell
+        rnn_cell_module.LSTMCell = tf_v1.nn.rnn_cell.LSTMCell
+        rnn_cell_module.BasicRNNCell = tf_v1.nn.rnn_cell.BasicRNNCell
+        rnn_cell_module.GRUCell = tf_v1.nn.rnn_cell.GRUCell
+        rnn_cell_module.MultiRNNCell = tf_v1.nn.rnn_cell.MultiRNNCell
+        rnn_cell_module.DropoutWrapper = tf_v1.nn.rnn_cell.DropoutWrapper
+        rnn_cell_module.ResidualWrapper = tf_v1.nn.rnn_cell.ResidualWrapper
+        rnn_cell_module.LSTMStateTuple = tf_v1.nn.rnn_cell.LSTMStateTuple
+
+        print("✅ rnn_cell module populated successfully")
+    except Exception as e:
+        print(f"Warning: Some RNN cell classes may not be available: {e}")
+
+    # Install rnn_cell in sys.modules and attach to tf.nn
+    sys.modules['tensorflow.nn.rnn_cell'] = rnn_cell_module
+    tf.nn.rnn_cell = rnn_cell_module
+
+    # Now populate the contrib.rnn module
     try:
         # Direct assignment to the rnn_module object
         rnn_module.BasicLSTMCell = tf_v1.nn.rnn_cell.BasicLSTMCell
@@ -177,6 +199,20 @@ def comprehensive_tf1_patch():
     if hasattr(tf_v1, 'summary'):
         tf.summary = tf_v1.summary
 
+    # Add additional RNN functions to tf.nn if they exist
+    try:
+        if not hasattr(tf.nn, 'static_rnn'):
+            tf.nn.static_rnn = tf_v1.nn.static_rnn
+        if not hasattr(tf.nn, 'dynamic_rnn'):
+            tf.nn.dynamic_rnn = tf_v1.nn.dynamic_rnn
+        if not hasattr(tf.nn, 'static_bidirectional_rnn'):
+            tf.nn.static_bidirectional_rnn = tf_v1.nn.static_bidirectional_rnn
+        if not hasattr(tf.nn, 'bidirectional_dynamic_rnn'):
+            tf.nn.bidirectional_dynamic_rnn = tf_v1.nn.bidirectional_dynamic_rnn
+        print("✅ Additional RNN functions added to tf.nn")
+    except Exception as e:
+        print(f"Warning: Could not add additional RNN functions: {e}")
+
     # Configure session
     try:
         config = tf_v1.ConfigProto()
@@ -191,6 +227,9 @@ def comprehensive_tf1_patch():
     print(f"✅ VariableScope available: {hasattr(tf, 'VariableScope')}")
     print(f"✅ contrib.framework available: {hasattr(tf.contrib, 'framework')}")
     print(f"✅ contrib.rnn available: {hasattr(tf.contrib, 'rnn')}")
+    print(f"✅ nn.rnn_cell available: {hasattr(tf.nn, 'rnn_cell')}")
+    print(
+        f"✅ nn.rnn_cell.GRUCell available: {hasattr(tf.nn.rnn_cell, 'GRUCell') if hasattr(tf.nn, 'rnn_cell') else False}")
     print(f"✅ Session available: {hasattr(tf, 'Session')}")
 
     return tf
