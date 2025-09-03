@@ -1,4 +1,4 @@
-
+# tf_293_patch.py
 """
 TensorFlow 2.9.3 + Python 3.8 compatibility patch for tfsnippet
 Optimized for your specific setup.
@@ -8,7 +8,7 @@ import types
 import warnings
 
 
-def patch_for_tf():
+def patch_for_tf_293():
     """Patch specifically for TensorFlow 2.9.3"""
 
     print("Applying TensorFlow 2.9.3 compatibility patch...")
@@ -101,6 +101,34 @@ def patch_for_tf():
     tf.random_normal = tf_v1.random_normal
     tf.random_uniform = tf_v1.random_uniform
 
+    # Critical: Add VariableScope class
+    tf.VariableScope = tf_v1.VariableScope
+
+    # Add other missing TF1 classes and functions
+    tf.AUTO_REUSE = tf_v1.AUTO_REUSE
+    tf.GLOBAL_VARIABLES = tf_v1.GraphKeys.GLOBAL_VARIABLES
+    tf.LOCAL_VARIABLES = tf_v1.GraphKeys.LOCAL_VARIABLES
+    tf.MODEL_VARIABLES = tf_v1.GraphKeys.MODEL_VARIABLES
+    tf.TRAINABLE_VARIABLES = tf_v1.GraphKeys.TRAINABLE_VARIABLES
+    tf.MOVING_AVERAGE_VARIABLES = tf_v1.GraphKeys.MOVING_AVERAGE_VARIABLES
+
+    # Add variable functions
+    tf.global_variables = tf_v1.global_variables
+    tf.local_variables = tf_v1.local_variables
+    tf.trainable_variables = tf_v1.trainable_variables
+    tf.model_variables = tf_v1.model_variables
+
+    # Add initializers
+    tf.variables_initializer = tf_v1.variables_initializer
+    tf.local_variables_initializer = tf_v1.local_variables_initializer
+
+    # Add other commonly used functions
+    tf.get_collection = tf_v1.get_collection
+    tf.add_to_collection = tf_v1.add_to_collection
+    tf.reset_default_graph = tf_v1.reset_default_graph
+    tf.get_default_graph = tf_v1.get_default_graph
+    tf.get_default_session = tf_v1.get_default_session
+
     # Configure session for TF 2.9.3
     try:
         config = tf_v1.ConfigProto()
@@ -111,11 +139,11 @@ def patch_for_tf():
     except Exception as e:
         print(f"Note: GPU configuration skipped: {e}")
 
-    print("TensorFlow 2.9.3 successfully patched for tfsnippet compatibility")
-    print(f"contrib.framework.add_arg_scope available: {hasattr(tf.contrib.framework, 'add_arg_scope')}")
+    print("✅ TensorFlow 2.9.3 successfully patched for tfsnippet compatibility")
+    print(f"✅ contrib.framework.add_arg_scope available: {hasattr(tf.contrib.framework, 'add_arg_scope')}")
 
     return tf
 
 
 # Apply patch immediately
-patch_for_tf()
+patch_for_tf_293()

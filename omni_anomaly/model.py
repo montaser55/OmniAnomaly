@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 from functools import partial
 
-import tensorflow.compat.v1 as tf
-tf.compat.v1.disable_v2_behavior()
+# import tensorflow.compat.v1 as tf
+# tf.compat.v1.disable_v2_behavior()
 import tensorflow_probability as tfp
 # import tfsnippet as spt
 from tensorflow.python.ops.linalg.linear_operator_identity import LinearOperatorIdentity
