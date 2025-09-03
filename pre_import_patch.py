@@ -1,28 +1,25 @@
-# tf_293_patch.py
+# comprehensive_tf_patch.py
 """
-TensorFlow 2.9.3 + Python 3.8 compatibility patch for tfsnippet
-Optimized for your specific setup.
+Comprehensive TensorFlow 1.x compatibility patch for tfsnippet
+Covers all the missing classes and functions.
 """
 import sys
 import types
 import warnings
 
 
-def patch_for_tf_293():
-    """Patch specifically for TensorFlow 2.9.3"""
+def comprehensive_tf1_patch():
+    """Most comprehensive TF1 compatibility patch"""
 
-    print("Applying TensorFlow 2.9.3 compatibility patch...")
+    print("Applying comprehensive TensorFlow 1.x compatibility patch...")
 
-    # Create contrib modules in sys.modules BEFORE tensorflow import
+    # Create contrib modules FIRST
     framework_module = types.ModuleType('tensorflow.contrib.framework')
 
     def add_arg_scope(func):
-        """Mock add_arg_scope - just returns the function unchanged"""
         return func
 
     def arg_scope(*args, **kwargs):
-        """Mock arg_scope context manager"""
-
         class ArgScopeContext:
             def __enter__(self):
                 return self
@@ -34,31 +31,26 @@ def patch_for_tf_293():
             return func
 
         if args and callable(args[0]):
-            # Called as decorator directly
             return decorator(args[0])
         else:
-            # Called as context manager
             return ArgScopeContext()
 
-    # Add functions to framework module
     framework_module.add_arg_scope = add_arg_scope
     framework_module.arg_scope = arg_scope
 
-    # Create contrib module
     contrib_module = types.ModuleType('tensorflow.contrib')
     contrib_module.framework = framework_module
 
-    # Install in sys.modules
     sys.modules['tensorflow.contrib'] = contrib_module
     sys.modules['tensorflow.contrib.framework'] = framework_module
 
-    # Now safely import tensorflow
+    # Import TensorFlow
     import tensorflow as tf
     import tensorflow.compat.v1 as tf_v1
 
     print(f"TensorFlow version: {tf.__version__}")
 
-    # Configure for TF1 behavior
+    # Configure TF1 behavior
     tf_v1.disable_v2_behavior()
     tf_v1.disable_eager_execution()
 
@@ -66,70 +58,126 @@ def patch_for_tf_293():
     warnings.filterwarnings('ignore', category=FutureWarning)
     tf.get_logger().setLevel('ERROR')
 
-    # Try to enhance with tf-slim
-    try:
-        import tf_slim as slim
-        print("Found tf-slim, enhancing contrib module...")
-
-        # Add slim functionality to contrib
-        for attr_name in dir(slim):
-            if not attr_name.startswith('_') and not hasattr(contrib_module, attr_name):
-                setattr(contrib_module, attr_name, getattr(slim, attr_name))
-
-        # Ensure framework is still our mock (slim might override)
-        contrib_module.framework.add_arg_scope = add_arg_scope
-        contrib_module.framework.arg_scope = arg_scope
-
-    except ImportError:
-        print("tf-slim not installed, using basic contrib mock")
-
-    # Link contrib to tensorflow
+    # Link contrib and populate RNN functions
     tf.contrib = contrib_module
     tf_v1.contrib = contrib_module
 
-    # Apply TF1 compatibility patches
-    tf.GraphKeys = tf_v1.GraphKeys
+    # Populate contrib.rnn with TF1 RNN functions
+    try:
+        # Map TF2 RNN cells to contrib.rnn
+        tf.contrib.rnn.BasicLSTMCell = tf_v1.nn.rnn_cell.BasicLSTMCell
+        tf.contrib.rnn.LSTMCell = tf_v1.nn.rnn_cell.LSTMCell
+        tf.contrib.rnn.BasicRNNCell = tf_v1.nn.rnn_cell.BasicRNNCell
+        tf.contrib.rnn.GRUCell = tf_v1.nn.rnn_cell.GRUCell
+        tf.contrib.rnn.MultiRNNCell = tf_v1.nn.rnn_cell.MultiRNNCell
+        tf.contrib.rnn.DropoutWrapper = tf_v1.nn.rnn_cell.DropoutWrapper
+        tf.contrib.rnn.ResidualWrapper = tf_v1.nn.rnn_cell.ResidualWrapper
+
+        # RNN functions
+        tf.contrib.rnn.static_rnn = tf_v1.nn.static_rnn
+        tf.contrib.rnn.dynamic_rnn = tf_v1.nn.dynamic_rnn
+        tf.contrib.rnn.static_bidirectional_rnn = tf_v1.nn.static_bidirectional_rnn
+        tf.contrib.rnn.bidirectional_dynamic_rnn = tf_v1.nn.bidirectional_dynamic_rnn
+
+        # State tuples
+        tf.contrib.rnn.LSTMStateTuple = tf_v1.nn.rnn_cell.LSTMStateTuple
+
+        print("✅ contrib.rnn populated with TF1 RNN functions")
+
+    except Exception as e:
+        print(f"Warning: Some RNN functions may not be available: {e}")
+
+        # Fallback: create basic RNN functions
+        class BasicLSTMCell:
+            def __init__(self, *args, **kwargs):
+                self._cell = tf_v1.nn.rnn_cell.BasicLSTMCell(*args, **kwargs)
+
+            def __call__(self, *args, **kwargs):
+                return self._cell(*args, **kwargs)
+
+            def __getattr__(self, name):
+                return getattr(self._cell, name)
+
+        tf.contrib.rnn.BasicLSTMCell = BasicLSTMCell
+        tf.contrib.rnn.dynamic_rnn = tf_v1.nn.dynamic_rnn
+
+    # COMPREHENSIVE TF1 PATCHING
+
+    # Core classes (CRITICAL for tfsnippet)
+    tf.VariableScope = tf_v1.VariableScope
+    tf.Operation = tf_v1.Operation if hasattr(tf_v1, 'Operation') else tf.Operation
+    tf.Graph = tf_v1.Graph if hasattr(tf_v1, 'Graph') else tf.Graph
+    tf.Tensor = tf_v1.Tensor if hasattr(tf_v1, 'Tensor') else tf.Tensor
+
+    # Session and execution
     tf.Session = tf_v1.Session
-    tf.placeholder = tf_v1.placeholder
+    tf.InteractiveSession = tf_v1.InteractiveSession
+    tf.get_default_session = tf_v1.get_default_session
+    tf.get_default_graph = tf_v1.get_default_graph
+    tf.reset_default_graph = tf_v1.reset_default_graph
+
+    # Variable and scope functions
     tf.variable_scope = tf_v1.variable_scope
     tf.get_variable_scope = tf_v1.get_variable_scope
     tf.name_scope = tf_v1.name_scope
-    tf.global_variables_initializer = tf_v1.global_variables_initializer
-    tf.train = tf_v1.train
-    tf.layers = tf_v1.layers
     tf.get_variable = tf_v1.get_variable
+
+    # Variable collections
+    tf.global_variables = tf_v1.global_variables
+    tf.local_variables = tf_v1.local_variables
+    tf.trainable_variables = tf_v1.trainable_variables
+    tf.model_variables = tf_v1.model_variables
+    tf.moving_average_variables = tf_v1.moving_average_variables
+    tf.get_collection = tf_v1.get_collection
+    tf.add_to_collection = tf_v1.add_to_collection
+
+    # Initializers
+    tf.global_variables_initializer = tf_v1.global_variables_initializer
+    tf.local_variables_initializer = tf_v1.local_variables_initializer
+    tf.variables_initializer = tf_v1.variables_initializer
+    tf.tables_initializer = tf_v1.tables_initializer
+
+    # Placeholders and ops
+    tf.placeholder = tf_v1.placeholder
+    tf.placeholder_with_default = tf_v1.placeholder_with_default
+
+    # Random functions
     tf.random_normal = tf_v1.random_normal
     tf.random_uniform = tf_v1.random_uniform
+    tf.random_gamma = tf_v1.random_gamma
+    tf.truncated_normal = tf_v1.truncated_normal
+    tf.random_shuffle = tf_v1.random_shuffle
 
-    # Critical: Add VariableScope class
-    tf.VariableScope = tf_v1.VariableScope
+    # Layers and training
+    tf.layers = tf_v1.layers
+    tf.train = tf_v1.train
 
-    # Add other missing TF1 classes and functions
-    tf.AUTO_REUSE = tf_v1.AUTO_REUSE
+    # Graph keys
+    tf.GraphKeys = tf_v1.GraphKeys
+
+    # Constants from GraphKeys
     tf.GLOBAL_VARIABLES = tf_v1.GraphKeys.GLOBAL_VARIABLES
     tf.LOCAL_VARIABLES = tf_v1.GraphKeys.LOCAL_VARIABLES
     tf.MODEL_VARIABLES = tf_v1.GraphKeys.MODEL_VARIABLES
     tf.TRAINABLE_VARIABLES = tf_v1.GraphKeys.TRAINABLE_VARIABLES
     tf.MOVING_AVERAGE_VARIABLES = tf_v1.GraphKeys.MOVING_AVERAGE_VARIABLES
+    tf.REGULARIZATION_LOSSES = tf_v1.GraphKeys.REGULARIZATION_LOSSES
+    tf.LOSSES = tf_v1.GraphKeys.LOSSES
+    tf.QUEUE_RUNNERS = tf_v1.GraphKeys.QUEUE_RUNNERS
 
-    # Add variable functions
-    tf.global_variables = tf_v1.global_variables
-    tf.local_variables = tf_v1.local_variables
-    tf.trainable_variables = tf_v1.trainable_variables
-    tf.model_variables = tf_v1.model_variables
+    # Variable reuse
+    tf.AUTO_REUSE = tf_v1.AUTO_REUSE
+    tf.REUSE = tf_v1.AUTO_REUSE  # Alias
 
-    # Add initializers
-    tf.variables_initializer = tf_v1.variables_initializer
-    tf.local_variables_initializer = tf_v1.local_variables_initializer
+    # Debugging and inspection
+    tf.Print = tf_v1.Print
+    tf.py_func = tf_v1.py_func
 
-    # Add other commonly used functions
-    tf.get_collection = tf_v1.get_collection
-    tf.add_to_collection = tf_v1.add_to_collection
-    tf.reset_default_graph = tf_v1.reset_default_graph
-    tf.get_default_graph = tf_v1.get_default_graph
-    tf.get_default_session = tf_v1.get_default_session
+    # Summary operations
+    if hasattr(tf_v1, 'summary'):
+        tf.summary = tf_v1.summary
 
-    # Configure session for TF 2.9.3
+    # Configure session
     try:
         config = tf_v1.ConfigProto()
         config.gpu_options.allow_growth = True
@@ -137,13 +185,15 @@ def patch_for_tf_293():
         tf_v1.keras.backend.set_session(tf_v1.Session(config=config))
         print("GPU configuration applied")
     except Exception as e:
-        print(f"Note: GPU configuration skipped: {e}")
+        print(f"GPU configuration skipped: {e}")
 
-    print("✅ TensorFlow 2.9.3 successfully patched for tfsnippet compatibility")
-    print(f"✅ contrib.framework.add_arg_scope available: {hasattr(tf.contrib.framework, 'add_arg_scope')}")
+    print("✅ Comprehensive TensorFlow 1.x compatibility patch applied")
+    print(f"✅ VariableScope available: {hasattr(tf, 'VariableScope')}")
+    print(f"✅ contrib.framework available: {hasattr(tf.contrib, 'framework')}")
+    print(f"✅ Session available: {hasattr(tf, 'Session')}")
 
     return tf
 
 
 # Apply patch immediately
-patch_for_tf_293()
+comprehensive_tf1_patch()
