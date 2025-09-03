@@ -58,48 +58,40 @@ def comprehensive_tf1_patch():
     warnings.filterwarnings('ignore', category=FutureWarning)
     tf.get_logger().setLevel('ERROR')
 
-    # Link contrib and populate RNN functions
+    # Link contrib modules to TensorFlow
     tf.contrib = contrib_module
     tf_v1.contrib = contrib_module
 
-    # Populate contrib.rnn with TF1 RNN functions
+    # Now populate the RNN module with actual functions
     try:
-        # Map TF2 RNN cells to contrib.rnn
-        tf.contrib.rnn.BasicLSTMCell = tf_v1.nn.rnn_cell.BasicLSTMCell
-        tf.contrib.rnn.LSTMCell = tf_v1.nn.rnn_cell.LSTMCell
-        tf.contrib.rnn.BasicRNNCell = tf_v1.nn.rnn_cell.BasicRNNCell
-        tf.contrib.rnn.GRUCell = tf_v1.nn.rnn_cell.GRUCell
-        tf.contrib.rnn.MultiRNNCell = tf_v1.nn.rnn_cell.MultiRNNCell
-        tf.contrib.rnn.DropoutWrapper = tf_v1.nn.rnn_cell.DropoutWrapper
-        tf.contrib.rnn.ResidualWrapper = tf_v1.nn.rnn_cell.ResidualWrapper
+        # Direct assignment to the rnn_module object
+        rnn_module.BasicLSTMCell = tf_v1.nn.rnn_cell.BasicLSTMCell
+        rnn_module.LSTMCell = tf_v1.nn.rnn_cell.LSTMCell
+        rnn_module.BasicRNNCell = tf_v1.nn.rnn_cell.BasicRNNCell
+        rnn_module.GRUCell = tf_v1.nn.rnn_cell.GRUCell
+        rnn_module.MultiRNNCell = tf_v1.nn.rnn_cell.MultiRNNCell
+        rnn_module.DropoutWrapper = tf_v1.nn.rnn_cell.DropoutWrapper
 
         # RNN functions
-        tf.contrib.rnn.static_rnn = tf_v1.nn.static_rnn
-        tf.contrib.rnn.dynamic_rnn = tf_v1.nn.dynamic_rnn
-        tf.contrib.rnn.static_bidirectional_rnn = tf_v1.nn.static_bidirectional_rnn
-        tf.contrib.rnn.bidirectional_dynamic_rnn = tf_v1.nn.bidirectional_dynamic_rnn
+        rnn_module.static_rnn = tf_v1.nn.static_rnn
+        rnn_module.dynamic_rnn = tf_v1.nn.dynamic_rnn
+        rnn_module.static_bidirectional_rnn = tf_v1.nn.static_bidirectional_rnn
+        rnn_module.bidirectional_dynamic_rnn = tf_v1.nn.bidirectional_dynamic_rnn
 
         # State tuples
-        tf.contrib.rnn.LSTMStateTuple = tf_v1.nn.rnn_cell.LSTMStateTuple
+        rnn_module.LSTMStateTuple = tf_v1.nn.rnn_cell.LSTMStateTuple
 
         print("✅ contrib.rnn populated with TF1 RNN functions")
 
     except Exception as e:
         print(f"Warning: Some RNN functions may not be available: {e}")
 
-        # Fallback: create basic RNN functions
-        class BasicLSTMCell:
-            def __init__(self, *args, **kwargs):
-                self._cell = tf_v1.nn.rnn_cell.BasicLSTMCell(*args, **kwargs)
+        # Create minimal fallback RNN functions
+        def dynamic_rnn(*args, **kwargs):
+            return tf_v1.nn.dynamic_rnn(*args, **kwargs)
 
-            def __call__(self, *args, **kwargs):
-                return self._cell(*args, **kwargs)
-
-            def __getattr__(self, name):
-                return getattr(self._cell, name)
-
-        tf.contrib.rnn.BasicLSTMCell = BasicLSTMCell
-        tf.contrib.rnn.dynamic_rnn = tf_v1.nn.dynamic_rnn
+        rnn_module.dynamic_rnn = dynamic_rnn
+        rnn_module.BasicLSTMCell = tf_v1.nn.rnn_cell.BasicLSTMCell
 
     # COMPREHENSIVE TF1 PATCHING
 
