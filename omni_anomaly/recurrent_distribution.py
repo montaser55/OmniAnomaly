@@ -1,204 +1,13 @@
 # -*- coding: utf-8 -*-
-import tensorflow.compat.v1 as tf
-tf.compat.v1.disable_v2_behavior()
-import tensorflow_probability as tfp
+# import tensorflow.compat.v1 as tf
+# tf.compat.v1.disable_v2_behavior()
+# import tensorflow_probability as tfp
+#
+# # from tfsnippet import Distribution, Normal
 
-# from tfsnippet import Distribution, Normal
-
-
-class Distribution:
-    """
-    Minimal replacement for tfsnippet Distribution base class.
-    This provides the basic interface that all distributions should implement.
-    """
-
-    def __init__(self):
-        self._is_continuous = True
-        self._is_reparameterized = False
-
-    @property
-    def is_continuous(self):
-        """Whether this is a continuous distribution"""
-        return self._is_continuous
-
-    @property
-    def is_reparameterized(self):
-        """Whether this distribution supports reparameterization"""
-        return self._is_reparameterized
-
-    @property
-    def dtype(self):
-        """Data type of the distribution"""
-        raise NotImplementedError("dtype property must be implemented")
-
-    @property
-    def value_shape(self):
-        """Shape of a single sample from the distribution"""
-        return self.get_value_shape()
-
-    def get_value_shape(self):
-        """Get the shape of a single sample"""
-        raise NotImplementedError("get_value_shape must be implemented")
-
-    @property
-    def batch_shape(self):
-        """Batch shape of the distribution"""
-        return self.get_batch_shape()
-
-    def get_batch_shape(self):
-        """Get the batch shape"""
-        raise NotImplementedError("get_batch_shape must be implemented")
-
-    def sample(self, n_samples=None, is_reparameterized=None, group_ndims=0,
-               compute_density=False, name=None):
-        """
-        Sample from the distribution.
-
-        Args:
-            n_samples: Number of samples to draw
-            is_reparameterized: Whether to use reparameterized sampling
-            group_ndims: Number of dimensions to consider as event dimensions
-            compute_density: Whether to compute density for the samples
-            name: Name scope for the operation
-
-        Returns:
-            Samples from the distribution
-        """
-        raise NotImplementedError("sample must be implemented")
-
-    def log_prob(self, given, group_ndims=0, name=None):
-        """
-        Compute log probability of given values.
-
-        Args:
-            given: Values to compute log probability for
-            group_ndims: Number of dimensions to consider as event dimensions
-            name: Name scope for the operation
-
-        Returns:
-            Log probabilities
-        """
-        raise NotImplementedError("log_prob must be implemented")
-
-    def prob(self, given, group_ndims=0, name=None):
-        """
-        Compute probability of given values.
-
-        Args:
-            given: Values to compute probability for
-            group_ndims: Number of dimensions to consider as event dimensions
-            name: Name scope for the operation
-
-        Returns:
-            Probabilities
-        """
-        log_p = self.log_prob(given, group_ndims=group_ndims, name=name)
-        return tf.exp(log_p)
-
-
-class Normal(Distribution):
-    """
-    Minimal replacement for tfsnippet Normal distribution.
-    Wraps tfp.distributions.Normal to maintain tfsnippet API.
-    """
-
-    def __init__(self, mean, std, is_reparameterized=True, dtype=tf.float32, name=None):
-        """
-        Initialize Normal distribution.
-
-        Args:
-            mean: Mean of the distribution
-            std: Standard deviation of the distribution
-            is_reparameterized: Whether to use reparameterized sampling
-            dtype: Data type of the distribution
-            name: Name of the distribution
-        """
-        super().__init__()
-        self.mean = mean
-        self.std = std
-        self._is_reparameterized = is_reparameterized
-        self._dtype = dtype
-        self._name = name
-
-        # Create the underlying TFP distribution
-        self._tfp_dist = tfp.distributions.Normal(
-            loc=mean,
-            scale=std,
-            validate_args=True,
-            allow_nan_stats=False,
-            name=name
-        )
-
-    @property
-    def dtype(self):
-        return self._dtype
-
-    def get_value_shape(self):
-        return self._tfp_dist.event_shape
-
-    def get_batch_shape(self):
-        return self._tfp_dist.batch_shape
-
-    def sample(self, n_samples=None, is_reparameterized=None, group_ndims=0,
-               compute_density=False, name=None):
-        """
-        Sample from the normal distribution.
-        """
-        if is_reparameterized is None:
-            is_reparameterized = self.is_reparameterized
-
-        with tf.name_scope(name or self._name or "normal_sample"):
-            # Sample from the underlying TFP distribution
-            if n_samples is not None:
-                samples = self._tfp_dist.sample(n_samples)
-            else:
-                samples = self._tfp_dist.sample()
-
-            # Simple wrapper to maintain compatibility with existing code
-            class SampleResult:
-                def __init__(self, tensor, distribution):
-                    self.tensor = tensor
-                    self.distribution = distribution
-
-                def log_prob(self):
-                    return self.distribution.log_prob(self.tensor)
-
-            result = SampleResult(samples, self)
-
-            if compute_density:
-                # Compute density if requested
-                result._self_prob = tf.exp(self.log_prob(samples))
-
-            return result
-
-    def log_prob(self, given, group_ndims=0, name=None):
-        """
-        Compute log probability of given values.
-        """
-        with tf.name_scope(name or self._name or "normal_log_prob"):
-            return self._tfp_dist.log_prob(given)
-
-    def __repr__(self):
-        return f"Normal(mean={self.mean}, std={self.std})"
-
-
-# Minimal StochasticTensor replacement
-class StochasticTensor:
-    def __init__(self, tensor, distribution, n_samples=1, group_ndims=0, is_reparameterized=None):
-        self.tensor = tensor
-        self.distribution = distribution
-        self.n_samples = n_samples
-        self.group_ndims = group_ndims
-        self.is_reparameterized = is_reparameterized if is_reparameterized is not None else distribution.is_reparameterized
-        self._self_prob = None
-
-    def log_prob(self):
-        return self.distribution.log_prob(self.tensor)
-
-    def prob(self):
-        if self._self_prob is None:
-            self._self_prob = tf.exp(self.log_prob())
-        return self._self_prob
+# -*- coding: utf-8 -*-
+import tensorflow as tf
+from tfsnippet import Distribution, Normal
 
 
 class RecurrentDistribution(Distribution):
@@ -238,7 +47,7 @@ class RecurrentDistribution(Distribution):
         input_q_n = tf.broadcast_to(input_q_n,
                                     [tf.shape(z_previous)[0], tf.shape(input_q_n)[0], input_q_n.shape[1]])
         input_q = tf.concat([input_q_n, z_previous], axis=-1)
-        mu_q = self.mean_q_mlp(input_q, reuse=tf.compat.v1.AUTO_REUSE)  # n_sample * batch_size * z_dim
+        mu_q = self.mean_q_mlp(input_q, reuse=tf.AUTO_REUSE)  # n_sample * batch_size * z_dim
 
         std_q = self.std_q_mlp(input_q)  # n_sample * batch_size * z_dim
 
@@ -249,19 +58,21 @@ class RecurrentDistribution(Distribution):
 
         return z_n, mu_q, std_q
 
+    # @global_reuse
     def log_prob_step(self, _, t):
+
         given_n, input_q_n = t
         if len(given_n.shape) > 2:
             input_q_n = tf.broadcast_to(input_q_n,
                                         [tf.shape(given_n)[0], tf.shape(input_q_n)[0], input_q_n.shape[1]])
         input_q = tf.concat([given_n, input_q_n], axis=-1)
-        mu_q = self.mean_q_mlp(input_q, reuse=tf.compat.v1.AUTO_REUSE)
+        mu_q = self.mean_q_mlp(input_q, reuse=tf.AUTO_REUSE)
 
         std_q = self.std_q_mlp(input_q)
-        logstd_q = tf.math.log(std_q)
+        logstd_q = tf.log(std_q)
         precision = tf.exp(-2 * logstd_q)
         if self._check_numerics:
-            precision = tf.debugging.check_numerics(precision, "precision")
+            precision = tf.check_numerics(precision, "precision")
         log_prob_n = - 0.9189385332046727 - logstd_q - 0.5 * precision * tf.square(tf.minimum(tf.abs(given_n - mu_q),
                                                                                               1e8))
         return log_prob_n
@@ -283,6 +94,8 @@ class RecurrentDistribution(Distribution):
 
     def sample(self, n_samples=1024, is_reparameterized=None, group_ndims=0, compute_density=False,
                name=None):
+
+        from tfsnippet.stochastic import StochasticTensor
         if n_samples is None:
             n_samples = 1
             n_samples_is_none = True
@@ -292,32 +105,32 @@ class RecurrentDistribution(Distribution):
             noise = self.normal.sample(n_samples=n_samples)
 
             noise = tf.transpose(noise, [1, 0, 2])  # window_length * n_samples * z_dim
-            noise = tf.random.truncated_normal(tf.shape(noise))
+            noise = tf.truncated_normal(tf.shape(noise))
 
             time_indices_shape = tf.convert_to_tensor([n_samples, tf.shape(self.input_q)[1], self.z_dim])
 
-            samples = tf.compat.v1.scan(fn=self.sample_step,
-                                        elems=(noise, self.input_q),
-                                        initializer=(tf.zeros(time_indices_shape),
-                                                     tf.zeros(time_indices_shape),
-                                                     tf.ones(time_indices_shape)),
-                                        back_prop=False
-                                        )[0]  # time_step * n_samples * batch_size * z_dim
+            samples = tf.scan(fn=self.sample_step,
+                              elems=(noise, self.input_q),
+                              initializer=(tf.zeros(time_indices_shape),
+                                           tf.zeros(time_indices_shape),
+                                           tf.ones(time_indices_shape)),
+                              back_prop=False
+                              )[0]  # time_step * n_samples * batch_size * z_dim
 
             samples = tf.transpose(samples, [1, 2, 0, 3])  # n_samples * batch_size * time_step *  z_dim
 
             if n_samples_is_none:
                 t = StochasticTensor(
-                    tensor=tf.reduce_mean(samples, axis=0),
                     distribution=self,
+                    tensor=tf.reduce_mean(samples, axis=0),
                     n_samples=1,
                     group_ndims=group_ndims,
                     is_reparameterized=self.is_reparameterized
                 )
             else:
                 t = StochasticTensor(
-                    tensor=samples,
                     distribution=self,
+                    tensor=samples,
                     n_samples=n_samples,
                     group_ndims=group_ndims,
                     is_reparameterized=self.is_reparameterized
@@ -336,11 +149,11 @@ class RecurrentDistribution(Distribution):
             else:
                 time_indices_shape = tf.convert_to_tensor([tf.shape(self.input_q)[1], self.z_dim])
                 given = tf.transpose(given, [1, 0, 2])
-            log_prob = tf.compat.v1.scan(fn=self.log_prob_step,
-                                         elems=(given, self.input_q),
-                                         initializer=tf.zeros(time_indices_shape),
-                                         back_prop=False
-                                         )
+            log_prob = tf.scan(fn=self.log_prob_step,
+                               elems=(given, self.input_q),
+                               initializer=tf.zeros(time_indices_shape),
+                               back_prop=False
+                               )
             if len(given.shape) > 3:
                 log_prob = tf.transpose(log_prob, [1, 2, 0, 3])
             else:

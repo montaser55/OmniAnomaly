@@ -111,8 +111,8 @@ def patch_for_tf():
     except Exception as e:
         print(f"Note: GPU configuration skipped: {e}")
 
-    print("✅ TensorFlow 2.9.3 successfully patched for tfsnippet compatibility")
-    print(f"✅ contrib.framework.add_arg_scope available: {hasattr(tf.contrib.framework, 'add_arg_scope')}")
+    print("TensorFlow 2.9.3 successfully patched for tfsnippet compatibility")
+    print(f"contrib.framework.add_arg_scope available: {hasattr(tf.contrib.framework, 'add_arg_scope')}")
 
     return tf
 

@@ -1,39 +1,55 @@
 # -*- coding: utf-8 -*-
 import logging
 
-import tensorflow.compat.v1 as tf
+# import tensorflow.compat.v1 as tf
+#
+# tf.compat.v1.disable_v2_behavior()
+# import tensorflow_probability as tfp
+#
+# tfd = tfp.distributions
+#
+# # Remove the custom Distribution class and use TFP's Distribution directly
+# # from tfsnippet.distributions import Distribution
+#
+# # Remove the entire custom Distribution class since we'll use TFP's directly
+#
 
-tf.compat.v1.disable_v2_behavior()
+# -*- coding: utf-8 -*-
+import logging
+
+import tensorflow as tf
 import tensorflow_probability as tfp
-
-tfd = tfp.distributions
-
-# Remove the custom Distribution class and use TFP's Distribution directly
-# from tfsnippet.distributions import Distribution
-
-# Remove the entire custom Distribution class since we'll use TFP's directly
+from tfsnippet.distributions import Distribution
 
 
-
-class TfpDistribution:
+class TfpDistribution(Distribution):
     """
-    A simplified wrapper class for `tfp.distributions.Distribution`
-    that provides compatibility interface
+    A wrapper class for `tfp.distributions.Distribution`
     """
-
-    def __init__(self, distribution):
-        if not isinstance(distribution, tfd.Distribution):
-            raise TypeError('`distribution` is not an instance of `tfp.distributions.Distribution`')
-        self._distribution = distribution
 
     @property
     def is_continuous(self):
-        return True  # Most TFP distributions are continuous
+        return self._is_continuous
+
+    def __init__(self, distribution):
+        if not isinstance(distribution, tfp.distributions.Distribution):
+            raise TypeError('`distribution` is not an instance of `tfp.'
+                            'distributions.Distribution`')
+        super(TfpDistribution, self).__init__()
+        self._distribution = distribution
+        self._is_continuous = True
+        self._is_reparameterized = self._distribution.reparameterization_type is tfp.distributions.FULLY_REPARAMETERIZED
+
+    def __repr__(self):
+        return 'Distribution({!r})'.format(self._distribution)
+
+    @property
+    def dtype(self):
+        return self._distribution.dtype
 
     @property
     def is_reparameterized(self):
-        return (hasattr(self._distribution, 'reparameterization_type') and
-                self._distribution.reparameterization_type == tfd.FULLY_REPARAMETERIZED)
+        return self._is_reparameterized
 
     @property
     def value_shape(self):
@@ -47,46 +63,37 @@ class TfpDistribution:
         return self._distribution.batch_shape
 
     def get_batch_shape(self):
-        return self._distribution.batch_shape
+        return self._distribution.batch_shape()
 
-    def sample(self, n_samples=None, is_reparameterized=None, group_ndims=0, compute_density=False, name=None):
-        with tf.name_scope(name or 'sample'):
-            if n_samples is not None:
-                samples = self._distribution.sample(n_samples)
-            else:
-                samples = self._distribution.sample()
-
-            # For compatibility, return an object with log_prob method
-            class SampleResult:
-                def __init__(self, tensor, distribution):
-                    self.tensor = tensor
-                    self.distribution = distribution
-
-                def log_prob(self):
-                    return self.distribution.log_prob(self.tensor)
-
-            result = SampleResult(samples, self)
-
+    def sample(self, n_samples=None, is_reparameterized=None, group_ndims=0, compute_density=False,
+               name=None):
+        from tfsnippet.stochastic import StochasticTensor
+        if n_samples is None or n_samples < 2:
+            n_samples = 2
+        with tf.name_scope(name=name, default_name='sample'):
+            samples = self._distribution.sample(n_samples)
+            samples = tf.reduce_mean(samples, axis=0)
+            t = StochasticTensor(
+                distribution=self,
+                tensor=samples,
+                n_samples=n_samples,
+                group_ndims=group_ndims,
+                is_reparameterized=self.is_reparameterized
+            )
             if compute_density:
-                # Precompute log probability if requested
-                result._log_prob = self.log_prob(samples)
-
-            return result
+                with tf.name_scope('compute_prob_and_log_prob'):
+                    log_p = t.log_prob()
+                    t._self_prob = tf.exp(log_p)
+            return t
 
     def log_prob(self, given, group_ndims=0, name=None):
-        with tf.name_scope(name or 'log_prob'):
-            return self._distribution.log_prob(given)
-
-    # Delegate other methods to the underlying distribution
-    def __getattr__(self, name):
-        return getattr(self._distribution, name)
-
-    def __repr__(self):
-        return f'TfpDistribution({repr(self._distribution)})'
+        with tf.name_scope(name=name, default_name='log_prob'):
+            log_prob, _, _, _, _, _, _ = self._distribution.forward_filter(given)
+            return log_prob
 
 
 def softplus_std(inputs, units, epsilon, name):
-    return tf.nn.softplus(tf.compat.v1.layers.dense(inputs, units, name=name, reuse=tf.compat.v1.AUTO_REUSE)) + epsilon
+    return tf.nn.softplus(tf.layers.dense(inputs, units, name=name, reuse=tf.AUTO_REUSE)) + epsilon
 
 
 def rnn(x,
@@ -97,8 +104,8 @@ def rnn(x,
         dense_dim=200,
         time_axis=1,
         name='rnn'):
-    # Use compat.v1 for RNN components
-    with tf.compat.v1.variable_scope(name, reuse=tf.compat.v1.AUTO_REUSE):
+    from tensorflow.contrib import rnn
+    with tf.variable_scope(name, reuse=tf.AUTO_REUSE):
         if len(x.shape) == 4:
             x = tf.reduce_mean(x, axis=0)
         elif len(x.shape) != 3:
@@ -108,28 +115,30 @@ def rnn(x,
         if rnn_cell == 'LSTM':
             # Define lstm cells with TensorFlow
             # Forward direction cell
-            fw_cell = tf.compat.v1.nn.rnn_cell.BasicLSTMCell(rnn_num_hidden, forget_bias=1.0)
+            fw_cell = rnn.BasicLSTMCell(rnn_num_hidden,
+                                        forget_bias=1.0)
         elif rnn_cell == "GRU":
-            fw_cell = tf.compat.v1.nn.rnn_cell.GRUCell(rnn_num_hidden)
+            fw_cell = tf.nn.rnn_cell.GRUCell(rnn_num_hidden)
         elif rnn_cell == 'Basic':
-            fw_cell = tf.compat.v1.nn.rnn_cell.BasicRNNCell(rnn_num_hidden)
+            fw_cell = tf.nn.rnn_cell.BasicRNNCell(rnn_num_hidden)
         else:
             raise ValueError("rnn_cell must be LSTM or GRU")
 
         # Get lstm cell output
+
         try:
-            outputs, _ = tf.compat.v1.nn.static_rnn(fw_cell, x, dtype=tf.float32)
+            outputs, _ = rnn.static_rnn(fw_cell, x, dtype=tf.float32)
         except Exception:  # Old TensorFlow version only returns outputs not states
-            outputs = tf.compat.v1.nn.static_rnn(fw_cell, x, dtype=tf.float32)
+            outputs = rnn.static_rnn(fw_cell, x, dtype=tf.float32)
         outputs = tf.stack(outputs, axis=time_axis)
         for i in range(hidden_dense):
-            outputs = tf.compat.v1.layers.dense(outputs, dense_dim)
+            outputs = tf.layers.dense(outputs, dense_dim)
         return outputs
     # return size: (batch_size, window_length, rnn_num_hidden)
 
 
 def wrap_params_net(inputs, h_for_dist, mean_layer, std_layer):
-    with tf.compat.v1.variable_scope('hidden', reuse=tf.compat.v1.AUTO_REUSE):
+    with tf.variable_scope('hidden', reuse=tf.AUTO_REUSE):
         h = h_for_dist(inputs)
     return {
         'mean': mean_layer(h),
@@ -138,7 +147,7 @@ def wrap_params_net(inputs, h_for_dist, mean_layer, std_layer):
 
 
 def wrap_params_net_srnn(inputs, h_for_dist):
-    with tf.compat.v1.variable_scope('hidden', reuse=tf.compat.v1.AUTO_REUSE):
+    with tf.variable_scope('hidden', reuse=tf.AUTO_REUSE):
         h = h_for_dist(inputs)
     return {
         'input_q': h

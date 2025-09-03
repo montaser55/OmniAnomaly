@@ -15,200 +15,20 @@ from omni_anomaly.recurrent_distribution import RecurrentDistribution
 from omni_anomaly.vae import Lambda, VAE
 from omni_anomaly.wrapper import TfpDistribution, softplus_std, rnn, wrap_params_net
 
+# -*- coding: utf-8 -*-
+from functools import partial
 
-class Normal:
-    """Minimal replacement for tfsnippet.distributions.Normal"""
+import tensorflow as tf
+import tfsnippet as spt
+from tensorflow.python.ops.linalg.linear_operator_identity import LinearOperatorIdentity
+from tensorflow_probability.python.distributions import LinearGaussianStateSpaceModel, MultivariateNormalDiag
+from tfsnippet.distributions import Normal
+from tfsnippet.utils import VarScopeObject, reopen_variable_scope
+from tfsnippet.variational import VariationalInference
 
-    def __init__(self, mean, std, is_reparameterized=True, **kwargs):
-        self.mean = mean
-        self.std = std
-        self._is_reparameterized = is_reparameterized
-        self._tfp_dist = tfp.distributions.Normal(loc=mean, scale=std, **kwargs)
-
-    @property
-    def is_reparameterized(self):
-        return self._is_reparameterized
-
-    @property
-    def is_continuous(self):
-        return True
-
-    def sample(self, n_samples=None, **kwargs):
-        if n_samples is not None:
-            samples = self._tfp_dist.sample(n_samples, **kwargs)
-        else:
-            samples = self._tfp_dist.sample(**kwargs)
-        return samples
-
-    def log_prob(self, value, **kwargs):
-        return self._tfp_dist.log_prob(value, **kwargs)
-
-    def prob(self, value, **kwargs):
-        return tf.exp(self.log_prob(value, **kwargs))
-
-
-# ==================== Utils (already defined, but included for completeness) ====================
-class VarScopeObject:
-    """Minimal replacement for tfsnippet.utils.VarScopeObject"""
-
-    def __init__(self, name=None, scope=None):
-        self._name = name
-        self._scope = scope or tf.compat.v1.get_variable_scope().name
-
-    @property
-    def name(self):
-        return self._name
-
-    @property
-    def variable_scope(self):
-        return self._scope
-
-
-def reopen_variable_scope(scope):
-    """Reopen a variable scope for reuse"""
-    return tf.compat.v1.variable_scope(scope, reuse=True)
-
-
-# ==================== Variational Inference Replacement ====================
-class VariationalInference:
-    """Minimal replacement for tfsnippet.variational.VariationalInference"""
-
-    def __init__(self, latent_log_joint, latent_log_probs, axis=None):
-        self.latent_log_joint = latent_log_joint
-        self.latent_log_probs = latent_log_probs
-        self.axis = axis
-
-        # Compute ELBO (Evidence Lower Bound)
-        self.log_likelihood = latent_log_joint
-        self.kl_divergence = self._compute_kl_divergence()
-        self.elbo = self.log_likelihood - self.kl_divergence
-        self.loss = -self.elbo  # Negative ELBO for minimization
-
-    def _compute_kl_divergence(self):
-        """Compute KL divergence between variational and prior distributions"""
-        if isinstance(self.latent_log_probs, dict):
-            # Sum KL divergences for multiple latent variables
-            kl_terms = []
-            for log_q, log_p in self.latent_log_probs.values():
-                kl_terms.append(log_q - log_p)
-            return tf.add_n(kl_terms)
-        else:
-            # Single latent variable case
-            log_q, log_p = self.latent_log_probs
-            return log_q - log_p
-
-    @property
-    def training_loss(self):
-        """Get the training loss (negative ELBO)"""
-        return self.loss
-
-    def reparameterized(self, *args, **kwargs):
-        """Stub for reparameterized training - returns the loss directly"""
-        return self.loss
-
-    def sgvb(self, *args, **kwargs):
-        """Stub for SGVB training - returns the loss directly"""
-        return self.loss
-
-    def reinforce(self, *args, **kwargs):
-        """Stub for REINFORCE training - returns the loss directly"""
-        return self.loss
-
-    def add_summary(self, name, value, *args, **kwargs):
-        """Simple summary addition"""
-        tf.summary.scalar(name, value, *args, **kwargs)
-
-    def __repr__(self):
-        return f"VariationalInference(elbo={self.elbo}, loss={self.loss})"
-
-
-# ==================== Helper functions for variational inference ====================
-def vi_objective(latent_log_joint, latent_log_probs, axis=None):
-    """Helper function to create VariationalInference objective"""
-    return VariationalInference(latent_log_joint, latent_log_probs, axis)
-
-
-def build_vi_objective(latent_log_joint, latent_log_probs, axis=None):
-    """Alternative helper function for VI objective"""
-    vi = VariationalInference(latent_log_joint, latent_log_probs, axis)
-    return vi.training_loss
-
-
-def planar_normalizing_flows_custom(num_flows, name='planar_normalizing_flows'):
-    """
-    Custom implementation of planar normalizing flows to replace spt.layers.planar_normalizing_flows
-    """
-    flows = []
-
-    # Use a unique scope name to avoid conflicts
-    with tf.compat.v1.variable_scope(name, reuse=tf.compat.v1.AUTO_REUSE):
-        for i in range(num_flows):
-            # Create a unique scope for each layer
-            layer_name = '{}_layer_{}'.format(name, i)
-            with tf.compat.v1.variable_scope(layer_name, reuse=tf.compat.v1.AUTO_REUSE):
-                # Define variables for each flow layer
-                scale = tf.compat.v1.get_variable(
-                    'scale',
-                    shape=[1],
-                    initializer=tf.compat.v1.constant_initializer(1.0)
-                )
-                shift = tf.compat.v1.get_variable(
-                    'shift',
-                    shape=[1],
-                    initializer=tf.compat.v1.constant_initializer(0.0)
-                )
-                u = tf.compat.v1.get_variable(
-                    'u',
-                    shape=[1],
-                    initializer=tf.compat.v1.constant_initializer(1.0)
-                )
-                w = tf.compat.v1.get_variable(
-                    'w',
-                    shape=[1],
-                    initializer=tf.compat.v1.constant_initializer(1.0)
-                )
-                b = tf.compat.v1.get_variable(
-                    'b',
-                    shape=[1],
-                    initializer=tf.compat.v1.constant_initializer(0.0)
-                )
-
-            # Create closure to capture the current variables
-            def make_flow_fn(scale, shift, u, w, b):
-                def flow_fn(z, log_det_jacobian):
-                    """
-                    Planar flow transformation: z' = z + u * tanh(w^T z + b)
-                    """
-                    # Compute the transformation
-                    linear_term = tf.reduce_sum(w * z, axis=-1, keepdims=True) + b
-                    activation = tf.tanh(linear_term)
-                    transformation = u * activation + shift
-                    z_transformed = z + scale * transformation
-
-                    # Compute log determinant of Jacobian
-                    psi = (1 - tf.square(activation)) * w
-                    det_jacobian = 1 + scale * tf.reduce_sum(u * psi, axis=-1, keepdims=True)
-                    log_det_jacobian += tf.reduce_sum(tf.math.log(tf.abs(det_jacobian) + 1e-8), axis=-1)
-
-                    return z_transformed, log_det_jacobian
-
-                return flow_fn
-
-            flows.append(make_flow_fn(scale, shift, u, w, b))
-
-    def apply_flows(z, log_det_jacobian=0.0):
-        """
-        Apply all flows in sequence
-        """
-        for flow in flows:
-            z, log_det_jacobian = flow(z, log_det_jacobian)
-        return z, log_det_jacobian
-
-    return apply_flows
-
-
-# ==================== Usage in your code ====================
-# In your model's __init__ method, replace:
+from omni_anomaly.recurrent_distribution import RecurrentDistribution
+from omni_anomaly.vae import Lambda, VAE
+from omni_anomaly.wrapper import TfpDistribution, softplus_std, rnn, wrap_params_net
 
 
 class OmniAnomaly(VarScopeObject):
@@ -217,9 +37,7 @@ class OmniAnomaly(VarScopeObject):
         super(OmniAnomaly, self).__init__(name=name, scope=scope)
         with reopen_variable_scope(self.variable_scope):
             if config.posterior_flow_type == 'nf':
-                # self._posterior_flow = spt.layers.planar_normalizing_flows(
-                #     config.nf_layers, name='posterior_flow')
-                self._posterior_flow = planar_normalizing_flows_custom(
+                self._posterior_flow = spt.layers.planar_normalizing_flows(
                     config.nf_layers, name='posterior_flow')
             else:
                 self._posterior_flow = None
@@ -242,7 +60,7 @@ class OmniAnomaly(VarScopeObject):
                 ) if config.use_connected_z_p else Normal(mean=tf.zeros([config.z_dim]), std=tf.ones([config.z_dim])),
                 p_x_given_z=Normal,
                 q_z_given_x=partial(RecurrentDistribution,
-                                    mean_q_mlp=partial(tf.compat.v1.layers.dense, units=config.z_dim, name='z_mean', reuse=tf.AUTO_REUSE),
+                                    mean_q_mlp=partial(tf.layers.dense, units=config.z_dim, name='z_mean', reuse=tf.AUTO_REUSE),
                                     std_q_mlp=partial(softplus_std, units=config.z_dim, epsilon=config.std_epsilon,
                                                       name='z_std'),
                                     z_dim=config.z_dim, window_length=config.window_length) if config.use_connected_z_q else Normal,
@@ -256,7 +74,7 @@ class OmniAnomaly(VarScopeObject):
                                                  dense_dim=config.dense_dim,
                                                  name='rnn_p_x'),
                         mean_layer=partial(
-                            tf.compat.v1.layers.dense, units=config.x_dim, name='x_mean', reuse=tf.AUTO_REUSE
+                            tf.layers.dense, units=config.x_dim, name='x_mean', reuse=tf.AUTO_REUSE
                         ),
                         std_layer=partial(
                             softplus_std, units=config.x_dim, epsilon=config.std_epsilon,
@@ -283,7 +101,7 @@ class OmniAnomaly(VarScopeObject):
                                                  dense_dim=config.dense_dim,
                                                  name="rnn_q_z"),
                         mean_layer=partial(
-                            tf.compat.v1.layers.dense, units=config.z_dim, name='z_mean', reuse=tf.AUTO_REUSE
+                            tf.layers.dense, units=config.z_dim, name='z_mean', reuse=tf.AUTO_REUSE
                         ),
                         std_layer=partial(
                             softplus_std, units=config.z_dim, epsilon=config.std_epsilon,

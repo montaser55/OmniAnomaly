@@ -1,109 +1,34 @@
 # -*- coding: utf-8 -*-
+# import time
+#
+# import numpy as np
+# import six
+# import tensorflow.compat.v1 as tf
+#
+# tf.compat.v1.disable_v2_behavior()
+#
+# # Replace tfsnippet imports with minimal implementations
+# # from tfsnippet.scaffold import TrainLoop
+# # from tfsnippet.shortcuts import VarScopeObject
+# # from tfsnippet.utils import (reopen_variable_scope,
+# #                              get_default_session_or_error,
+# #                              ensure_variables_initialized,
+# #                              get_variables_as_dict)
+#
+# from omni_anomaly.utils import BatchSlidingWindow
 import time
 
 import numpy as np
 import six
-import tensorflow.compat.v1 as tf
-
-tf.compat.v1.disable_v2_behavior()
-
-# Replace tfsnippet imports with minimal implementations
-# from tfsnippet.scaffold import TrainLoop
-# from tfsnippet.shortcuts import VarScopeObject
-# from tfsnippet.utils import (reopen_variable_scope,
-#                              get_default_session_or_error,
-#                              ensure_variables_initialized,
-#                              get_variables_as_dict)
+import tensorflow as tf
+from tfsnippet.scaffold import TrainLoop
+from tfsnippet.shortcuts import VarScopeObject
+from tfsnippet.utils import (reopen_variable_scope,
+                             get_default_session_or_error,
+                             ensure_variables_initialized,
+                             get_variables_as_dict)
 
 from omni_anomaly.utils import BatchSlidingWindow
-
-class TrainLoop:
-    def __init__(self, max_epoch=None, max_step=None, name='TrainLoop'):
-        self.max_epoch = max_epoch
-        self.max_step = max_step
-        self.name = name
-        self._epoch = 0
-        self._step = 0
-
-    def __iter__(self):
-        return self
-
-    def __next__(self):
-        if (self.max_epoch is not None and self._epoch >= self.max_epoch) or \
-                (self.max_step is not None and self._step >= self.max_step):
-            raise StopIteration
-
-        result = (self._epoch, self._step)
-        self._step += 1
-        if self.max_step is None or self._step >= self.max_step:
-            self._epoch += 1
-            self._step = 0
-
-        return result
-
-    def add_event_handler(self, event, handler):
-        # Simple event handler stub
-        pass
-
-    def print_logs(self, *args, **kwargs):
-        # Simple logging stub
-        print(*args, **kwargs)
-
-
-# VarScopeObject (already defined previously, but here's the complete version)
-class VarScopeObject:
-    def __init__(self, name=None, scope=None):
-        self._name = name
-        self._scope = scope or tf.compat.v1.get_variable_scope().name
-
-    @property
-    def name(self):
-        return self._name
-
-    @property
-    def variable_scope(self):
-        return self._scope
-
-
-# Minimal utils replacements
-def reopen_variable_scope(scope):
-    """Reopen a variable scope for reuse"""
-    return tf.compat.v1.variable_scope(scope, reuse=True)
-
-
-def get_default_session_or_error():
-    """Get the default TensorFlow session"""
-    session = tf.compat.v1.get_default_session()
-    if session is None:
-        raise RuntimeError('No default TensorFlow session is available.')
-    return session
-
-
-def ensure_variables_initialized(var_list=None):
-    """Ensure variables are initialized"""
-    if var_list is None:
-        var_list = tf.compat.v1.global_variables()
-
-    # Try to get initializer op
-    try:
-        init_op = tf.compat.v1.variables_initializer(var_list)
-        session = get_default_session_or_error()
-        session.run(init_op)
-    except:
-        # Fallback: let TensorFlow handle initialization
-        pass
-
-
-def get_variables_as_dict(scope=None, collection=tf.compat.v1.GraphKeys.GLOBAL_VARIABLES):
-    """Get variables as a dictionary"""
-    if scope is None:
-        vars_list = tf.compat.v1.get_collection(collection)
-    else:
-        vars_list = tf.compat.v1.get_collection(collection, scope=scope)
-
-    return {var.name.split(':')[0]: var for var in vars_list}
-
-
 
 __all__ = ['Trainer']
 
@@ -165,8 +90,7 @@ class Trainer(VarScopeObject):
                  max_epoch=256, max_step=None, batch_size=256,
                  valid_batch_size=1024, valid_step_freq=100,
                  initial_lr=0.001, lr_anneal_epochs=10, lr_anneal_factor=0.75,
-                 # optimizer=tf.train.AdamOptimizer, optimizer_params=None,
-                 optimizer=tf.compat.v1.train.AdamOptimizer, optimizer_params=None,
+                 optimizer=tf.train.AdamOptimizer, optimizer_params=None,
                  grad_clip_norm=50.0, check_numerics=True,
                  name=None, scope=None):
         super(Trainer, self).__init__(name=name, scope=scope)
@@ -195,13 +119,17 @@ class Trainer(VarScopeObject):
         self._lr_anneal_factor = lr_anneal_factor
 
         # build the trainer
-        with tf.compat.v1.variable_scope(self.variable_scope, reuse=tf.compat.v1.AUTO_REUSE):
+        with reopen_variable_scope(self.variable_scope):
+            # the global step for this model
+            self._global_step = tf.get_variable(
+                dtype=tf.int64, name='global_step', trainable=False,
+                initializer=tf.constant(0, dtype=tf.int64)
+            )
+
             # input placeholders
-            # self._input_x = tf.placeholder(
-            self._input_x = tf.compat.v1.placeholder(
+            self._input_x = tf.placeholder(
                 dtype=tf.float32, shape=[None, model.window_length, model.x_dims], name='input_x')
-            # self._learning_rate = tf.placeholder(
-            self._learning_rate = tf.compat.v1.placeholder(
+            self._learning_rate = tf.placeholder(
                 dtype=tf.float32, shape=(), name='learning_rate')
 
             # compose the training loss
@@ -209,14 +137,12 @@ class Trainer(VarScopeObject):
                 loss = model.get_training_loss(
                     x=self._input_x, n_z=n_z)
                 if use_regularization_loss:
-                    # loss += tf.losses.get_regularization_loss()
-                    loss += tf.compat.v1.losses.get_regularization_loss()
+                    loss += tf.losses.get_regularization_loss()
                 self._loss = loss
 
             # get the training variables
             train_params = get_variables_as_dict(
-                # scope=model_vs, collection=tf.GraphKeys.TRAINABLE_VARIABLES)
-                scope=model_vs,collection=tf.compat.v1.GraphKeys.TRAINABLE_VARIABLES)
+                scope=model_vs, collection=tf.GraphKeys.TRAINABLE_VARIABLES)
             self._train_params = train_params
 
             # create the trainer
@@ -244,25 +170,20 @@ class Trainer(VarScopeObject):
                     grad_vars.append((grad, var))
 
             # build the training op
-            # with tf.control_dependencies(
-            #         tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
             with tf.control_dependencies(
-                    tf.compat.v1.get_collection(tf.compat.v1.GraphKeys.UPDATE_OPS)):
+                    tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
                 self._train_op = self._optimizer.apply_gradients(
                     grad_vars, global_step=self._global_step)
 
             # the training summary in case `summary_dir` is specified
             with tf.name_scope('summary'):
-                # self._summary_op = tf.summary.merge([
-                #     tf.summary.histogram(v.name.rsplit(':', 1)[0], v)
-                self._summary_op = tf.compat.v1.summary.merge([
-                    tf.compat.v1.summary.histogram(v.name.rsplit(':', 1)[0], v)
+                self._summary_op = tf.summary.merge([
+                    tf.summary.histogram(v.name.rsplit(':', 1)[0], v)
                     for v in six.itervalues(self._train_params)
                 ])
 
             # initializer for the variables
-            # self._trainer_initializer = tf.variables_initializer(
-            self._trainer_initializer = tf.compat.v1.variables_initializer(
+            self._trainer_initializer = tf.variables_initializer(
                 list(six.itervalues(get_variables_as_dict(scope=self.variable_scope,
                                                           collection=tf.GraphKeys.GLOBAL_VARIABLES)))
             )

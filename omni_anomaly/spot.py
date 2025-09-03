@@ -3,7 +3,7 @@
 """
 Created on Mon Dec 12 10:08:16 2016
 
-@author: Alban Siffer 
+@author: Alban Siffer
 @company: Amossys
 @license: GNU GPLv3
 """
@@ -28,30 +28,30 @@ air_force_blue = '#5D8AA8'
 class SPOT:
     """
     This class allows to run SPOT algorithm on univariate dataset (upper-bound)
-    
+
     Attributes
     ----------
     proba : float
         Detection level (risk), chosen by the user
-        
+
     extreme_quantile : float
         current threshold (bound between normal and abnormal events)
-        
+
     data : numpy.array
         stream
-    
+
     init_data : numpy.array
         initial batch of observations (for the calibration/initialization step)
-    
+
     init_threshold : float
         initial threshold computed during the calibration step
-    
+
     peaks : numpy.array
         array of peaks (excesses above the initial threshold)
-    
+
     n : int
         number of observed values
-    
+
     Nt : int
         number of observed peaks
     """
@@ -64,7 +64,7 @@ class SPOT:
 	    ----------
 	    q
 		    Detection level (risk)
-	
+
 	    Returns
 	    ----------
     	SPOT object
@@ -109,15 +109,15 @@ class SPOT:
     def fit(self, init_data, data):
         """
         Import data to SPOT object
-        
+
         Parameters
 	    ----------
 	    init_data : list, numpy.array or pandas.Series
 		    initial batch to calibrate the algorithm
-            
+
         data : numpy.array
 		    data for the run (list, np.array or pd.series)
-	
+
         """
         if isinstance(data, list):
             self.data = np.array(data)
@@ -149,7 +149,7 @@ class SPOT:
     def add(self, data):
         """
         This function allows to append data to the already fitted data
-        
+
         Parameters
 	    ----------
 	    data : list, numpy.array, pandas.Series
@@ -171,11 +171,11 @@ class SPOT:
     def initialize(self, level=0.98, min_extrema=False, verbose=True):
         """
         Run the calibration (initialization) step
-        
+
         Parameters
 	    ----------
         level : float
-            (default 0.98) Probability associated with the initial threshold t 
+            (default 0.98) Probability associated with the initial threshold t
 	    verbose : bool
 		    (default = True) If True, gives details about the batch initialization
         verbose: bool
@@ -220,20 +220,20 @@ class SPOT:
     def _rootsFinder(fun, jac, bounds, npoints, method):
         """
         Find possible roots of a scalar function
-        
+
         Parameters
         ----------
         fun : function
 		    scalar function
         jac : function
-            first order derivative of the function  
+            first order derivative of the function
         bounds : tuple
-            (min,max) interval for the roots search    
+            (min,max) interval for the roots search
         npoints : int
-            maximum number of roots to output      
+            maximum number of roots to output
         method : str
             'regular' : regular sample of the search interval, 'random' : uniform (distribution) sample of the search interval
-        
+
         Returns
         ----------
         numpy.array
@@ -267,7 +267,7 @@ class SPOT:
     def _log_likelihood(Y, gamma, sigma):
         """
         Compute the log-likelihood for the Generalized Pareto Distribution (μ=0)
-        
+
         Parameters
         ----------
         Y : numpy.array
@@ -275,7 +275,7 @@ class SPOT:
         gamma : float
             GPD index parameter
         sigma : float
-            GPD scale parameter (>0)   
+            GPD scale parameter (>0)
 
         Returns
         ----------
@@ -293,7 +293,7 @@ class SPOT:
     def _grimshaw(self, epsilon=1e-8, n_points=10):
         """
         Compute the GPD parameters estimation with the Grimshaw's trick
-        
+
         Parameters
         ----------
         epsilon : float
@@ -373,7 +373,7 @@ class SPOT:
     def _quantile(self, gamma, sigma):
         """
         Compute the quantile at level 1-q
-        
+
         Parameters
         ----------
         gamma : float
@@ -395,7 +395,7 @@ class SPOT:
     def run(self, with_alarm=True, dynamic=True):
         """
         Run SPOT on the stream
-        
+
         Parameters
         ----------
         with_alarm : bool
@@ -407,10 +407,10 @@ class SPOT:
         ----------
         dict
             keys : 'thresholds' and 'alarms'
-            
+
             'thresholds' contains the extreme quantiles and 'alarms' contains \
             the indexes of the values which have triggered alarms
-            
+
         """
         if self.n > self.init_data.size:
             print('Warning : the algorithm seems to have already been run, you \
@@ -463,7 +463,7 @@ class SPOT:
     def plot(self, run_results, with_alarm=True):
         """
         Plot the results of given by the run
-        
+
         Parameters
         ----------
         run_results : dict
@@ -476,7 +476,7 @@ class SPOT:
         ----------
         list
             list of the plots
-            
+
         """
         x = range(self.data.size)
         K = run_results.keys()
@@ -507,30 +507,30 @@ class SPOT:
 class biSPOT:
     """
     This class allows to run biSPOT algorithm on univariate dataset (upper and lower bounds)
-    
+
     Attributes
     ----------
     proba : float
         Detection level (risk), chosen by the user
-        
+
     extreme_quantile : float
         current threshold (bound between normal and abnormal events)
-        
+
     data : numpy.array
         stream
-    
+
     init_data : numpy.array
         initial batch of observations (for the calibration/initialization step)
-    
+
     init_threshold : float
         initial threshold computed during the calibration step
-    
+
     peaks : numpy.array
         array of peaks (excesses above the initial threshold)
-    
+
     n : int
         number of observed values
-    
+
     Nt : int
         number of observed peaks
     """
@@ -543,7 +543,7 @@ class biSPOT:
 	    ----------
 	    q
 		    Detection level (risk)
-	
+
 	    Returns
 	    ----------
         biSPOT object
@@ -594,15 +594,15 @@ class biSPOT:
     def fit(self, init_data, data):
         """
         Import data to biSPOT object
-        
+
         Parameters
 	    ----------
 	    init_data : list, numpy.array or pandas.Series
 		    initial batch to calibrate the algorithm ()
-            
+
         data : numpy.array
 		    data for the run (list, np.array or pd.series)
-	
+
         """
         if isinstance(data, list):
             self.data = np.array(data)
@@ -634,7 +634,7 @@ class biSPOT:
     def add(self, data):
         """
         This function allows to append data to the already fitted data
-        
+
         Parameters
 	    ----------
 	    data : list, numpy.array, pandas.Series
@@ -656,7 +656,7 @@ class biSPOT:
     def initialize(self, verbose=True):
         """
         Run the calibration (initialization) step
-        
+
         Parameters
 	    ----------
 	    verbose : bool
@@ -704,20 +704,20 @@ class biSPOT:
     def _rootsFinder(fun, jac, bounds, npoints, method):
         """
         Find possible roots of a scalar function
-        
+
         Parameters
         ----------
         fun : function
-		    scalar function 
+		    scalar function
         jac : function
-            first order derivative of the function  
+            first order derivative of the function
         bounds : tuple
-            (min,max) interval for the roots search    
+            (min,max) interval for the roots search
         npoints : int
-            maximum number of roots to output      
+            maximum number of roots to output
         method : str
             'regular' : regular sample of the search interval, 'random' : uniform (distribution) sample of the search interval
-        
+
         Returns
         ----------
         numpy.array
@@ -751,7 +751,7 @@ class biSPOT:
     def _log_likelihood(Y, gamma, sigma):
         """
         Compute the log-likelihood for the Generalized Pareto Distribution (μ=0)
-        
+
         Parameters
         ----------
         Y : numpy.array
@@ -759,7 +759,7 @@ class biSPOT:
         gamma : float
             GPD index parameter
         sigma : float
-            GPD scale parameter (>0)   
+            GPD scale parameter (>0)
 
         Returns
         ----------
@@ -777,7 +777,7 @@ class biSPOT:
     def _grimshaw(self, side, epsilon=1e-8, n_points=10):
         """
         Compute the GPD parameters estimation with the Grimshaw's trick
-        
+
         Parameters
         ----------
         epsilon : float
@@ -857,7 +857,7 @@ class biSPOT:
     def _quantile(self, side, gamma, sigma):
         """
         Compute the quantile at level 1-q for a given side
-        
+
         Parameters
         ----------
         side : str
@@ -890,7 +890,7 @@ class biSPOT:
     def run(self, with_alarm=True):
         """
         Run biSPOT on the stream
-        
+
         Parameters
         ----------
         with_alarm : bool
@@ -902,10 +902,10 @@ class biSPOT:
         ----------
         dict
             keys : 'upper_thresholds', 'lower_thresholds' and 'alarms'
-            
+
             '***-thresholds' contains the extreme quantiles and 'alarms' contains \
             the indexes of the values which have triggered alarms
-            
+
         """
         if (self.n > self.init_data.size):
             print('Warning : the algorithm seems to have already been run, you \
@@ -980,7 +980,7 @@ class biSPOT:
     def plot(self, run_results, with_alarm=True):
         """
         Plot the results of given by the run
-        
+
         Parameters
         ----------
         run_results : dict
@@ -993,7 +993,7 @@ class biSPOT:
         ----------
         list
             list of the plots
-            
+
         """
         x = range(self.data.size)
         K = run_results.keys()
@@ -1039,33 +1039,33 @@ def backMean(X, d):
 class dSPOT:
     """
     This class allows to run DSPOT algorithm on univariate dataset (upper-bound)
-    
+
     Attributes
     ----------
     proba : float
         Detection level (risk), chosen by the user
-        
+
     depth : int
         Number of observations to compute the moving average
-        
+
     extreme_quantile : float
         current threshold (bound between normal and abnormal events)
-        
+
     data : numpy.array
         stream
-    
+
     init_data : numpy.array
         initial batch of observations (for the calibration/initialization step)
-    
+
     init_threshold : float
         initial threshold computed during the calibration step
-    
+
     peaks : numpy.array
         array of peaks (excesses above the initial threshold)
-    
+
     n : int
         number of observed values
-    
+
     Nt : int
         number of observed peaks
     """
@@ -1113,15 +1113,15 @@ class dSPOT:
     def fit(self, init_data, data):
         """
         Import data to DSPOT object
-        
+
         Parameters
 	    ----------
 	    init_data : list, numpy.array or pandas.Series
 		    initial batch to calibrate the algorithm
-            
+
         data : numpy.array
 		    data for the run (list, np.array or pd.series)
-	
+
         """
         if isinstance(data, list):
             self.data = np.array(data)
@@ -1153,7 +1153,7 @@ class dSPOT:
     def add(self, data):
         """
         This function allows to append data to the already fitted data
-        
+
         Parameters
 	    ----------
 	    data : list, numpy.array, pandas.Series
@@ -1175,7 +1175,7 @@ class dSPOT:
     def initialize(self, verbose=True):
         """
         Run the calibration (initialization) step
-        
+
         Parameters
 	    ----------
 	    verbose : bool
@@ -1214,20 +1214,20 @@ class dSPOT:
     def _rootsFinder(fun, jac, bounds, npoints, method):
         """
         Find possible roots of a scalar function
-        
+
         Parameters
         ----------
         fun : function
-		    scalar function 
+		    scalar function
         jac : function
-            first order derivative of the function  
+            first order derivative of the function
         bounds : tuple
-            (min,max) interval for the roots search    
+            (min,max) interval for the roots search
         npoints : int
-            maximum number of roots to output      
+            maximum number of roots to output
         method : str
             'regular' : regular sample of the search interval, 'random' : uniform (distribution) sample of the search interval
-        
+
         Returns
         ----------
         numpy.array
@@ -1261,7 +1261,7 @@ class dSPOT:
     def _log_likelihood(Y, gamma, sigma):
         """
         Compute the log-likelihood for the Generalized Pareto Distribution (μ=0)
-        
+
         Parameters
         ----------
         Y : numpy.array
@@ -1269,7 +1269,7 @@ class dSPOT:
         gamma : float
             GPD index parameter
         sigma : float
-            GPD scale parameter (>0)   
+            GPD scale parameter (>0)
 
         Returns
         ----------
@@ -1287,7 +1287,7 @@ class dSPOT:
     def _grimshaw(self, epsilon=1e-8, n_points=10):
         """
         Compute the GPD parameters estimation with the Grimshaw's trick
-        
+
         Parameters
         ----------
         epsilon : float
@@ -1367,7 +1367,7 @@ class dSPOT:
     def _quantile(self, gamma, sigma):
         """
         Compute the quantile at level 1-q
-        
+
         Parameters
         ----------
         gamma : float
@@ -1389,7 +1389,7 @@ class dSPOT:
     def run(self, with_alarm=True):
         """
         Run biSPOT on the stream
-        
+
         Parameters
         ----------
         with_alarm : bool
@@ -1401,10 +1401,10 @@ class dSPOT:
         ----------
         dict
             keys : 'upper_thresholds', 'lower_thresholds' and 'alarms'
-            
+
             '***-thresholds' contains the extreme quantiles and 'alarms' contains \
             the indexes of the values which have triggered alarms
-            
+
         """
         if (self.n > self.init_data.size):
             print('Warning : the algorithm seems to have already been run, you \
@@ -1458,7 +1458,7 @@ class dSPOT:
     def plot(self, run_results, with_alarm=True):
         """
         Plot the results given by the run
-        
+
         Parameters
         ----------
         run_results : dict
@@ -1471,7 +1471,7 @@ class dSPOT:
         ----------
         list
             list of the plots
-            
+
         """
         x = range(self.data.size)
         K = run_results.keys()
@@ -1512,33 +1512,33 @@ class dSPOT:
 class bidSPOT:
     """
     This class allows to run DSPOT algorithm on univariate dataset (upper and lower bounds)
-    
+
     Attributes
     ----------
     proba : float
         Detection level (risk), chosen by the user
-        
+
     depth : int
         Number of observations to compute the moving average
-        
+
     extreme_quantile : float
         current threshold (bound between normal and abnormal events)
-        
+
     data : numpy.array
         stream
-    
+
     init_data : numpy.array
         initial batch of observations (for the calibration/initialization step)
-    
+
     init_threshold : float
         initial threshold computed during the calibration step
-    
+
     peaks : numpy.array
         array of peaks (excesses above the initial threshold)
-    
+
     n : int
         number of observed values
-    
+
     Nt : int
         number of observed peaks
     """
@@ -1592,15 +1592,15 @@ class bidSPOT:
     def fit(self, init_data, data):
         """
         Import data to biDSPOT object
-        
+
         Parameters
 	    ----------
 	    init_data : list, numpy.array or pandas.Series
 		    initial batch to calibrate the algorithm
-            
+
         data : numpy.array
 		    data for the run (list, np.array or pd.series)
-	
+
         """
         if isinstance(data, list):
             self.data = np.array(data)
@@ -1632,7 +1632,7 @@ class bidSPOT:
     def add(self, data):
         """
         This function allows to append data to the already fitted data
-        
+
         Parameters
 	    ----------
 	    data : list, numpy.array, pandas.Series
@@ -1654,7 +1654,7 @@ class bidSPOT:
     def initialize(self, verbose=True):
         """
         Run the calibration (initialization) step
-        
+
         Parameters
 	    ----------
 	    verbose : bool
@@ -1704,20 +1704,20 @@ class bidSPOT:
     def _rootsFinder(fun, jac, bounds, npoints, method):
         """
         Find possible roots of a scalar function
-        
+
         Parameters
         ----------
         fun : function
-		    scalar function 
+		    scalar function
         jac : function
-            first order derivative of the function  
+            first order derivative of the function
         bounds : tuple
-            (min,max) interval for the roots search    
+            (min,max) interval for the roots search
         npoints : int
-            maximum number of roots to output      
+            maximum number of roots to output
         method : str
             'regular' : regular sample of the search interval, 'random' : uniform (distribution) sample of the search interval
-        
+
         Returns
         ----------
         numpy.array
@@ -1751,7 +1751,7 @@ class bidSPOT:
     def _log_likelihood(Y, gamma, sigma):
         """
         Compute the log-likelihood for the Generalized Pareto Distribution (μ=0)
-        
+
         Parameters
         ----------
         Y : numpy.array
@@ -1759,7 +1759,7 @@ class bidSPOT:
         gamma : float
             GPD index parameter
         sigma : float
-            GPD scale parameter (>0)   
+            GPD scale parameter (>0)
 
         Returns
         ----------
@@ -1777,7 +1777,7 @@ class bidSPOT:
     def _grimshaw(self, side, epsilon=1e-8, n_points=8):
         """
         Compute the GPD parameters estimation with the Grimshaw's trick
-        
+
         Parameters
         ----------
         epsilon : float
@@ -1857,7 +1857,7 @@ class bidSPOT:
     def _quantile(self, side, gamma, sigma):
         """
         Compute the quantile at level 1-q for a given side
-        
+
         Parameters
         ----------
         side : str
@@ -1890,7 +1890,7 @@ class bidSPOT:
     def run(self, with_alarm=True, plot=True):
         """
         Run biDSPOT on the stream
-        
+
         Parameters
         ----------
         with_alarm : bool
@@ -1902,10 +1902,10 @@ class bidSPOT:
         ----------
         dict
             keys : 'upper_thresholds', 'lower_thresholds' and 'alarms'
-            
+
             '***-thresholds' contains the extreme quantiles and 'alarms' contains \
             the indexes of the values which have triggered alarms
-            
+
         """
         if (self.n > self.init_data.size):
             print('Warning : the algorithm seems to have already been run, you \
@@ -1988,7 +1988,7 @@ class bidSPOT:
     def plot(self, run_results, with_alarm=True):
         """
         Plot the results given by the run
-        
+
         Parameters
         ----------
         run_results : dict
@@ -2001,7 +2001,7 @@ class bidSPOT:
         ----------
         list
             list of the plots
-            
+
         """
         x = range(self.data.size)
         K = run_results.keys()
