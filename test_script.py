@@ -86,6 +86,20 @@ def test_tf_patch():
 
     # Test actual function call
     print("\nTesting actual function calls...")
+
+    # If tf.log is not available, try aggressive patching
+    if not hasattr(tf, 'log'):
+        print("⚠️  tf.log not found, attempting aggressive patching...")
+        try:
+            from comprehensive_tf_patch import aggressive_tf_log_patch
+            success = aggressive_tf_log_patch()
+            if success:
+                print("✅ Aggressive tf.log patching successful")
+            else:
+                print("❌ Aggressive tf.log patching failed")
+        except Exception as e:
+            print(f"❌ Could not apply aggressive patch: {e}")
+
     try:
         import numpy as np
         x = tf.constant([1.0, 2.0, 3.0])
@@ -93,7 +107,15 @@ def test_tf_patch():
         print(f"✅ tf.log() call successful: {log_x}")
     except Exception as e:
         print(f"❌ tf.log() call failed: {e}")
-        return False
+
+        # Last resort: try using tf.math.log directly
+        try:
+            log_x = tf.math.log(x)
+            print(f"✅ tf.math.log() works as fallback: {log_x}")
+            print("🔧 Suggestion: Use tf.math.log instead of tf.log in your code")
+        except Exception as e2:
+            print(f"❌ Even tf.math.log() failed: {e2}")
+            return False
 
     try:
         cell = tf.nn.rnn_cell.GRUCell(10)

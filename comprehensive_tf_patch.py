@@ -279,3 +279,6 @@ def comprehensive_tf1_patch():
 
 # Apply patch immediately
 comprehensive_tf1_patch()
+
+# # Apply aggressive log patch as a final measure
+# aggressive_tf_log_patch()
