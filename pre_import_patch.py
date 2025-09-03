@@ -15,6 +15,7 @@ def comprehensive_tf1_patch():
 
     # Create contrib modules FIRST
     framework_module = types.ModuleType('tensorflow.contrib.framework')
+    rnn_module = types.ModuleType('tensorflow.contrib.rnn')
 
     def add_arg_scope(func):
         return func
@@ -38,11 +39,15 @@ def comprehensive_tf1_patch():
     framework_module.add_arg_scope = add_arg_scope
     framework_module.arg_scope = arg_scope
 
+    # Create main contrib module with submodules
     contrib_module = types.ModuleType('tensorflow.contrib')
     contrib_module.framework = framework_module
+    contrib_module.rnn = rnn_module
 
+    # Install all modules in sys.modules
     sys.modules['tensorflow.contrib'] = contrib_module
     sys.modules['tensorflow.contrib.framework'] = framework_module
+    sys.modules['tensorflow.contrib.rnn'] = rnn_module
 
     # Import TensorFlow
     import tensorflow as tf
@@ -71,6 +76,7 @@ def comprehensive_tf1_patch():
         rnn_module.GRUCell = tf_v1.nn.rnn_cell.GRUCell
         rnn_module.MultiRNNCell = tf_v1.nn.rnn_cell.MultiRNNCell
         rnn_module.DropoutWrapper = tf_v1.nn.rnn_cell.DropoutWrapper
+        rnn_module.ResidualWrapper = tf_v1.nn.rnn_cell.ResidualWrapper
 
         # RNN functions
         rnn_module.static_rnn = tf_v1.nn.static_rnn
@@ -92,6 +98,8 @@ def comprehensive_tf1_patch():
 
         rnn_module.dynamic_rnn = dynamic_rnn
         rnn_module.BasicLSTMCell = tf_v1.nn.rnn_cell.BasicLSTMCell
+
+        print("✅ contrib.rnn created with fallback functions")
 
     # COMPREHENSIVE TF1 PATCHING
 
@@ -175,13 +183,14 @@ def comprehensive_tf1_patch():
         config.gpu_options.allow_growth = True
         config.allow_soft_placement = True
         tf_v1.keras.backend.set_session(tf_v1.Session(config=config))
-        print("GPU configuration applied")
+        print("✅ GPU configuration applied")
     except Exception as e:
         print(f"GPU configuration skipped: {e}")
 
     print("✅ Comprehensive TensorFlow 1.x compatibility patch applied")
     print(f"✅ VariableScope available: {hasattr(tf, 'VariableScope')}")
     print(f"✅ contrib.framework available: {hasattr(tf.contrib, 'framework')}")
+    print(f"✅ contrib.rnn available: {hasattr(tf.contrib, 'rnn')}")
     print(f"✅ Session available: {hasattr(tf, 'Session')}")
 
     return tf
