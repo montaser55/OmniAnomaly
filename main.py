@@ -1,18 +1,18 @@
 # -*- coding: utf-8 -*-
 
-import pre_import_patch
-import logging
-import os
-import pickle
-import sys
-import time
-import warnings
-from argparse import ArgumentParser
-from pprint import pformat, pprint
-import json
-
-import numpy as np
-import tensorflow as tf
+import comprehensive_tf_patch
+# import logging
+# import os
+# import pickle
+# import sys
+# import time
+# import warnings
+# from argparse import ArgumentParser
+# from pprint import pformat, pprint
+# import json
+#
+# import numpy as np
+# import tensorflow as tf
 
 # tf.compat.v1.disable_v2_behavior()
 
