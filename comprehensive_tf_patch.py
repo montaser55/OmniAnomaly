@@ -173,6 +173,7 @@ def comprehensive_tf1_patch():
 
     # Layers and training
     tf.layers = tf_v1.layers
+    tf.losses = tf_v1.losses
     tf.train = tf_v1.train
 
     # Graph keys
