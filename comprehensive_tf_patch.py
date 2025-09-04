@@ -280,5 +280,36 @@ def comprehensive_tf1_patch():
 # Apply patch immediately
 comprehensive_tf1_patch()
 
-# # Apply aggressive log patch as a final measure
-# aggressive_tf_log_patch()
+
+def aggressive_tf_log_patch():
+    """Aggressively patch tf.log using multiple methods"""
+    try:
+        import tensorflow as tf
+        import sys
+
+        tf_module = sys.modules.get('tensorflow')
+        if tf_module is None:
+            return False
+
+        # Method 1: Direct assignment
+        tf.log = tf.math.log
+
+        # Method 2: setattr on module
+        setattr(tf_module, 'log', tf.math.log)
+
+        # Method 3: Direct module dictionary manipulation
+        tf_module.__dict__['log'] = tf.math.log
+
+        # Method 4: sys.modules manipulation
+        sys.modules['tensorflow'].log = tf.math.log
+        sys.modules['tensorflow'].__dict__['log'] = tf.math.log
+
+        print(f"✅ Aggressive tf.log patch applied: {hasattr(tf, 'log')}")
+        return hasattr(tf, 'log')
+    except Exception as e:
+        print(f"❌ Aggressive tf.log patch failed: {e}")
+        return False
+
+
+# Apply aggressive log patch as a final measure
+aggressive_tf_log_patch()
