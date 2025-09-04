@@ -137,6 +137,7 @@ def comprehensive_tf1_patch():
     tf.get_default_session = tf_v1.get_default_session
     tf.get_default_graph = tf_v1.get_default_graph
     tf.reset_default_graph = tf_v1.reset_default_graph
+    tf.check_numerics = tf_v1.check_numerics
 
     # Variable and scope functions
     tf.variable_scope = tf_v1.variable_scope
