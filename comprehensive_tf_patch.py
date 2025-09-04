@@ -1,7 +1,7 @@
 # comprehensive_tf_patch.py
 """
 Comprehensive TensorFlow 1.x compatibility patch for tfsnippet
-Covers all the missing classes and functions including rnn_cell.
+Covers all the missing classes and functions including rnn_cell and check_numerics.
 """
 import sys
 import types
@@ -195,6 +195,21 @@ def comprehensive_tf1_patch():
     tf.Print = tf_v1.Print
     tf.py_func = tf_v1.py_func
 
+    # *** CRITICAL FIX: Add check_numerics ***
+    tf.check_numerics = tf_v1.check_numerics
+
+    # Additional debugging and numerical functions
+    try:
+        tf.assert_finite = tf_v1.debugging.assert_finite if hasattr(tf_v1.debugging, 'assert_finite') else tf_v1.assert_finite
+        tf.assert_non_negative = tf_v1.debugging.assert_non_negative if hasattr(tf_v1.debugging, 'assert_non_negative') else tf_v1.assert_non_negative
+        tf.assert_positive = tf_v1.debugging.assert_positive if hasattr(tf_v1.debugging, 'assert_positive') else tf_v1.assert_positive
+        tf.is_finite = tf.math.is_finite  # Should already exist in TF2
+        tf.is_nan = tf.math.is_nan  # Should already exist in TF2
+        tf.is_inf = tf.math.is_inf  # Should already exist in TF2
+        print("✅ Additional debugging functions added")
+    except Exception as e:
+        print(f"Warning: Some debugging functions may not be available: {e}")
+
     # Summary operations
     if hasattr(tf_v1, 'summary'):
         tf.summary = tf_v1.summary
@@ -273,43 +288,10 @@ def comprehensive_tf1_patch():
     print(
         f"✅ nn.rnn_cell.GRUCell available: {hasattr(tf.nn.rnn_cell, 'GRUCell') if hasattr(tf.nn, 'rnn_cell') else False}")
     print(f"✅ Session available: {hasattr(tf, 'Session')}")
+    print(f"✅ check_numerics available: {hasattr(tf, 'check_numerics')}")
 
     return tf
 
 
 # Apply patch immediately
 comprehensive_tf1_patch()
-
-
-def aggressive_tf_log_patch():
-    """Aggressively patch tf.log using multiple methods"""
-    try:
-        import tensorflow as tf
-        import sys
-
-        tf_module = sys.modules.get('tensorflow')
-        if tf_module is None:
-            return False
-
-        # Method 1: Direct assignment
-        tf.log = tf.math.log
-
-        # Method 2: setattr on module
-        setattr(tf_module, 'log', tf.math.log)
-
-        # Method 3: Direct module dictionary manipulation
-        tf_module.__dict__['log'] = tf.math.log
-
-        # Method 4: sys.modules manipulation
-        sys.modules['tensorflow'].log = tf.math.log
-        sys.modules['tensorflow'].__dict__['log'] = tf.math.log
-
-        print(f"✅ Aggressive tf.log patch applied: {hasattr(tf, 'log')}")
-        return hasattr(tf, 'log')
-    except Exception as e:
-        print(f"❌ Aggressive tf.log patch failed: {e}")
-        return False
-
-
-# Apply aggressive log patch as a final measure
-aggressive_tf_log_patch()
