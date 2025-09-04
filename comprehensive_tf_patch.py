@@ -159,6 +159,7 @@ def comprehensive_tf1_patch():
     tf.local_variables_initializer = tf_v1.local_variables_initializer
     tf.variables_initializer = tf_v1.variables_initializer
     tf.tables_initializer = tf_v1.tables_initializer
+    tf.is_variable_initialized = tf_v1.is_variable_initialized
 
     # Placeholders and ops
     tf.placeholder = tf_v1.placeholder
