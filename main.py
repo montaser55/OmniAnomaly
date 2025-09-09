@@ -1,28 +1,5 @@
 # -*- coding: utf-8 -*-
-
 import comprehensive_tf_patch
-# import logging
-# import os
-# import pickle
-# import sys
-# import time
-# import warnings
-# from argparse import ArgumentParser
-# from pprint import pformat, pprint
-# import json
-#
-# import numpy as np
-# import tensorflow as tf
-
-# tf.compat.v1.disable_v2_behavior()
-
-from omni_anomaly.eval_methods import pot_eval, bf_search
-from omni_anomaly.model import OmniAnomaly
-from omni_anomaly.prediction import Predictor
-from omni_anomaly.training import Trainer
-from omni_anomaly.utils import get_data_dim, get_data, save_z
-
-# -*- coding: utf-8 -*-
 import logging
 import os
 import pickle

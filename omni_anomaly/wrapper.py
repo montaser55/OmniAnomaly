@@ -1,22 +1,6 @@
 # -*- coding: utf-8 -*-
 import logging
 
-# import tensorflow.compat.v1 as tf
-#
-# tf.compat.v1.disable_v2_behavior()
-# import tensorflow_probability as tfp
-#
-# tfd = tfp.distributions
-#
-# # Remove the custom Distribution class and use TFP's Distribution directly
-# # from tfsnippet.distributions import Distribution
-#
-# # Remove the entire custom Distribution class since we'll use TFP's directly
-#
-
-# -*- coding: utf-8 -*-
-import logging
-
 import tensorflow as tf
 import tensorflow_probability as tfp
 from tfsnippet.distributions import Distribution

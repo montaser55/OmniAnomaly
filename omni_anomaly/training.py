@@ -1,21 +1,4 @@
 # -*- coding: utf-8 -*-
-# import time
-#
-# import numpy as np
-# import six
-# import tensorflow.compat.v1 as tf
-#
-# tf.compat.v1.disable_v2_behavior()
-#
-# # Replace tfsnippet imports with minimal implementations
-# # from tfsnippet.scaffold import TrainLoop
-# # from tfsnippet.shortcuts import VarScopeObject
-# # from tfsnippet.utils import (reopen_variable_scope,
-# #                              get_default_session_or_error,
-# #                              ensure_variables_initialized,
-# #                              get_variables_as_dict)
-#
-# from omni_anomaly.utils import BatchSlidingWindow
 import time
 
 import numpy as np

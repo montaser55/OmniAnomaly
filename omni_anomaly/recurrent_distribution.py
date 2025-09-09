@@ -1,11 +1,4 @@
 # -*- coding: utf-8 -*-
-# import tensorflow.compat.v1 as tf
-# tf.compat.v1.disable_v2_behavior()
-# import tensorflow_probability as tfp
-#
-# # from tfsnippet import Distribution, Normal
-
-# -*- coding: utf-8 -*-
 import tensorflow as tf
 from tfsnippet import Distribution, Normal
 
